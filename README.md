@@ -1,40 +1,36 @@
 # AI Quota Monitor
 
-AI Quota Monitor 是一个面向 Windows 的本地只读额度监控项目，目标是在一个界面中查看
-多个 OpenCode Go、Ollama Cloud 和 ClinePass 账号的额度窗口、重置时间和凭据健康状态。
+AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个里程碑是在一个界面中查看
+多个 OpenCode Go、Ollama Cloud 和 ClinePass 账号的额度窗口、重置时间和凭据健康状态，
+后续可以继续扩展账号操作、客户端联动和请求路由能力。
 
-## 产品边界
+## 开发期望
 
-- 只读取额度，不切换账号、不修改其他客户端配置。
-- 不代理模型请求，不记录提示词、回复或代码内容。
-- 不提供账号注册、邀请奖励、自动续费或批量账号操作。
-- 密钥和登录 Cookie 不写入普通配置文件或 SQLite 明文字段。
+- 先把多供应商、多账号额度监控做可靠，再按实际需求扩展其他能力。
+- 架构为账号切换、客户端集成、代理/路由和使用分析预留空间，不把 MVP 范围写成永久禁令。
+- 首版优先采用本地存储和手工录入凭据，后续可以增加经用户授权的浏览器导入或其他方式。
+- 安全要求关注“避免意外泄露和越权”，而不是禁止未来功能；新增能力应有明确开关和数据说明。
+- 设计是实现基线，可以根据真实接口、用户体验和开发证据持续调整。
 
-## 最终方案摘要
+## 当前方案
 
-| 方面 | 已确认方案 |
+| 方面 | 当前选择 |
 | --- | --- |
-| 产品形态 | Windows-only 的 Tauri 2 本地桌面应用 |
+| 产品形态 | Windows 优先的 Tauri 2 本地桌面应用 |
 | 前后端 | React + TypeScript UI，Rust Core，SQLite |
 | 账号模型 | 三家供应商、多账号；凭据与账号 N:1，可让一个登录态覆盖多个 Workspace |
-| 数据采集 | 只调用额度 API 或读取 Dashboard，不调用模型推理接口 |
+| 数据采集 | 首期通过额度 API 或 Dashboard；以后可接入客户端或请求链路数据 |
 | 调度 | 默认 15 分钟；达到 Warning 后提高到 5 分钟，带迟滞、退避和供应商级熔断 |
-| 凭据 | Windows Credential Manager；超长 Cookie 使用 CurrentUser DPAPI 文件后备 |
-| 安全边界 | HTTPS allowlist、禁用 cookie jar 和自动重定向、秘密只允许 UI → Rust 单向提交 |
+| 凭据 | 首期使用 Windows Credential Manager；超长 Cookie 使用 CurrentUser DPAPI 后备 |
+| 安全策略 | 当前额度适配器采用 HTTPS allowlist、受控重定向和脱敏日志 |
 | 告警 | Warning / High / Critical、状态代次去重、静默时段不补发 |
 | 历史 | 默认 30 天，可选 7 / 90 天或关闭；支持脱敏 JSON 导出 |
-| 扩展 | 首版不开网络端口；后续本地只读 API 默认关闭且仅绑定 loopback |
+| 可演进方向 | 账号操作、客户端联动、浏览器凭据导入、代理/路由、本地 API、使用分析 |
 
-详细设计、数据模型、安全要求、测试计划和验收门只以
-[docs/DESIGN.md](docs/DESIGN.md) 为准。
+## 文档
 
-## 文档入口
+- [docs/DESIGN.md](docs/DESIGN.md)：当前设计、数据模型、阶段计划和验收标准。
+- [AGENTS.md](AGENTS.md)：仓库内的简要协作规则。
 
-| 文件 | 职责 |
-| --- | --- |
-| [STATUS.md](STATUS.md) | 当前阶段、最后验证、下一动作 |
-| [AGENTS.md](AGENTS.md) | Agent 协作、提案审计和实现约束 |
-| [docs/DESIGN.md](docs/DESIGN.md) | 完整设计的单一事实来源（SSOT） |
-| [docs/proposals/README.md](docs/proposals/README.md) | 设计提案与审计结果索引 |
-
-当前已经完成双方设计审议，下一阶段是 Phase 0 只读探针；准确状态见 `STATUS.md`。
+当前状态：设计基线已完成，尚未开始编码；下一步是用三个轻量探针验证真实额度接口。
+已结束的评审记录保存在 `docs/archive/`，日常开发无需读取。
