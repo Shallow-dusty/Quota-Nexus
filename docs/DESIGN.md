@@ -3,7 +3,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档状态 | Draft for implementation |
-| 设计版本 | 0.1.0 |
+| 设计版本 | 0.2.0 |
 | 最后更新 | 2026-07-30 |
 | 首要平台 | Windows 11 |
 | 产品形态 | 本地桌面应用 |
@@ -135,12 +135,18 @@ Manager 或 DPAPI 的保护范围仍然是当前用户边界。
 
 - 桌面壳：Tauri 2。
 - 后端：Rust。
-- 前端：React + TypeScript + Vite。
+- 前端：React + TypeScript + Vite；使用 pnpm、Tailwind CSS 和 shadcn/ui。
+- 首版 UI 文案采用简体中文；国际化后置。Phase 2 可以先实现结构占位，但发布前必须满足
+  §11 和 §18 的完整验收标准；用户提供概念图后可再按提案流程细化视觉设计。
 - 本地数据库：SQLite。
 - 凭据存储：Windows Credential Manager；必要时使用 CurrentUser 范围的 DPAPI 作为后备。
 - 通知：Windows Toast。
-- HTTP：Rust `reqwest`，禁用自动跨域凭据转发。
+- HTTP：Rust `reqwest`；首版 Windows 构建优先采用 `native-tls` 以使用系统证书库，
+  禁用自动重定向并由应用逐跳校验目标。
 - 时间：数据库统一保存 UTC，UI 按本地时区显示。
+- Rust 基线依赖：`sqlx`（SQLite/migrate）、`keyring-core` +
+  `windows-native-keyring-store`（WCM）、`secrecy` + `zeroize`、`reqwest`、
+  `tracing`、`scraper`。具体版本在实现时锁定并由依赖审计验证。
 
 选择 Tauri 而不是 Electron 的原因：
 
@@ -188,16 +194,21 @@ UI 只接收脱敏后的领域对象，不直接接触 API Key 或 Cookie。凭�
 
 默认策略：
 
-- 默认周期：5 分钟。
-- 可选周期：手动、2、5、15、30 分钟。
+- 基础周期：15 分钟。
+- 可选周期：手动、5、15、30 分钟。
+- 自适应周期：账号任一窗口达到 Warning 阈值时切换到 5 分钟；仅当所有窗口均低于
+  Warning 阈值 5 个百分点时恢复基础周期，避免阈值附近抖动。当前有效周期在
+  Diagnostics 中可见。用户选择“手动”时关闭所有周期与自适应刷新。
 - 每个账号增加 0–15 秒稳定随机抖动，避免所有账号同一时刻请求。
 - 全局最大并发：4。
 - 同一供应商最大并发：2。
 - 成功请求不自动重试。
-- 网络错误：10 秒、30 秒各重试一次。
-- 401/403：不重试，直接标记认证失效。
-- 429：尊重 `Retry-After`；没有该头时至少等待 5 分钟。
-- 解析错误：不重试，保留响应结构指纹用于脱敏诊断。
+- 账号级网络/超时/5xx 连续失败按 5、10、20、40、60 分钟退避，成功后归零。
+- 401/403：暂停该账号自动刷新，直到凭据被更新或用户显式重新验证。
+- 429：优先尊重 `Retry-After`；没有该头时至少等待 5 分钟，并沿用账号级退避上限。
+- 解析/schema 错误：触发供应商级适配器熔断，避免同一失效 parser 逐账号重复请求；
+  保留响应结构指纹用于脱敏诊断。
+- 手动刷新可绕过网络/429 退避一次，但不得绕过认证暂停或供应商级 parser 熔断。
 
 ### 6.3 Provider Adapter 接口
 
@@ -224,6 +235,19 @@ pub trait QuotaProvider {
 
 适配器返回供应商原生窗口，Normalizer 再转换为统一模型。适配器不得直接写数据库、发通知
 或更新 UI。
+
+### 6.4 HTTP 与进程边界
+
+- `reqwest` 不启用 cookie store；每次请求在通过适配器 allowlist 后才从秘密类型中手工
+  注入 Cookie/API Key。
+- 自动重定向设为 `none`。需要跟随时最多 3 跳，每跳重新校验 HTTPS、host、path 和
+  origin；只有新目标与该凭据声明的 origin 完全匹配时才重新注入秘密。
+- HTTP client 默认跟随 Windows 系统代理设置；不提供账号级代理。系统代理只改变传输
+  路径，不改变目标 allowlist 或凭据作用域。
+- 应用使用单实例插件。第二次启动只唤起已有窗口并转发无秘密的启动意图，避免两个进程
+  同时调度和写 SQLite。
+- Tauri IPC 将秘密视为 UI → Rust 的单向数据：后端响应、event payload、错误对象和调试
+  序列化均不得包含秘密、`credentialRef` 或可逆片段。
 
 ## 7. 供应商适配器
 
@@ -346,14 +370,31 @@ interface ProviderAccount {
   providerId: ProviderId;
   label: string;
   externalScope?: string;     // 例如 Workspace ID；不存秘密
-  credentialRef: string;      // Credential Manager 引用
+  credentialId: string;       // 指向可被多个账号复用的本地 Credential
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
 ```
 
-### 8.2 QuotaWindow
+### 8.2 Credential
+
+```ts
+interface Credential {
+  id: string;                 // 本地 UUID
+  providerId: ProviderId;
+  label: string;
+  credentialRef: string;      // wcm:<target> 或 dpapi:<absolute-path>
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+同一凭据可以关联多个账号。例如同一个 OpenCode 登录 Cookie 可读取多个 Workspace，
+每个 Workspace 仍作为独立 `ProviderAccount` 展示和调度。删除账号不得自动删除仍被其他
+账号引用的凭据；凭据只在引用数为零且用户确认删除时从安全存储移除。
+
+### 8.3 QuotaWindow
 
 ```ts
 type WindowKind =
@@ -367,7 +408,6 @@ interface QuotaWindow {
   kind: WindowKind;
   label: string;
   usedPercent: number;
-  remainingPercent: number;
   resetsAt?: string;
   observedAt: string;
   source: "remote_api" | "dashboard";
@@ -377,12 +417,13 @@ interface QuotaWindow {
 规则：
 
 - 数据库统一保存 `usedPercent`，范围为 0–100。
-- `remainingPercent = 100 - usedPercent`，只作为派生值。
+- `remainingPercent = 100 - usedPercent`，仅在 UI/API 输出边界计算，不进入持久化领域对象。
 - 超出范围的上游值不得静默截断，应作为 schema error。
 - 缺失 `resetsAt` 不使整个快照失败，但 UI 必须显示“重置时间未知”。
+- `observedAt` 优先采用可信的上游观测时间；上游未提供时使用本次 `fetchedAt`。
 - 不同供应商的额度金额或请求数不可直接相加。
 
-### 8.3 Snapshot
+### 8.4 Snapshot
 
 ```ts
 interface QuotaSnapshot {
@@ -391,12 +432,15 @@ interface QuotaSnapshot {
   plan?: string;
   windows: QuotaWindow[];
   fetchedAt: string;
-  freshness: "fresh" | "stale";
   adapterVersion: string;
 }
 ```
 
-### 8.4 Error
+`freshness` 是查询时派生状态，不持久化：当
+`now - fetchedAt <= max(2 × 当前有效刷新周期, 30 分钟)` 时为 `fresh`，否则为 `stale`。
+手动模式按 30 分钟界限判断。修改刷新周期会立即改变新鲜度判定，不需要回写历史快照。
+
+### 8.5 Error
 
 ```ts
 type ProviderErrorKind =
@@ -422,81 +466,123 @@ type ProviderErrorKind =
 ### 9.1 SQLite 表
 
 ```text
+credentials
+  id TEXT PRIMARY KEY
+  provider_id TEXT NOT NULL
+  label TEXT NOT NULL
+  credential_ref TEXT NOT NULL UNIQUE
+  created_at TEXT NOT NULL
+  updated_at TEXT NOT NULL
+
 accounts
   id TEXT PRIMARY KEY
   provider_id TEXT NOT NULL
   label TEXT NOT NULL
   external_scope TEXT
-  credential_ref TEXT NOT NULL
+  credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE RESTRICT
   enabled INTEGER NOT NULL
   created_at TEXT NOT NULL
   updated_at TEXT NOT NULL
 
 quota_snapshots
   id TEXT PRIMARY KEY
-  account_id TEXT NOT NULL
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
   fetched_at TEXT NOT NULL
   plan TEXT
-  freshness TEXT NOT NULL
   adapter_version TEXT NOT NULL
 
 quota_windows
-  snapshot_id TEXT NOT NULL
+  snapshot_id TEXT NOT NULL REFERENCES quota_snapshots(id) ON DELETE CASCADE
   kind TEXT NOT NULL
   label TEXT NOT NULL
   used_percent REAL NOT NULL
   resets_at TEXT
   observed_at TEXT NOT NULL
   source TEXT NOT NULL
+  PRIMARY KEY (snapshot_id, kind)
 
 alert_rules
   id TEXT PRIMARY KEY
-  account_id TEXT
+  account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE
   window_kind TEXT
   warning_percent REAL NOT NULL
+  high_percent REAL NOT NULL
   critical_percent REAL NOT NULL
   enabled INTEGER NOT NULL
 
 alert_deliveries
-  account_id TEXT NOT NULL
+  id TEXT PRIMARY KEY
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
   window_kind TEXT NOT NULL
-  reset_cycle_key TEXT NOT NULL
   threshold REAL NOT NULL
+  state_generation INTEGER NOT NULL
   delivered_at TEXT NOT NULL
+
+alert_window_state
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
+  window_kind TEXT NOT NULL
+  state_generation INTEGER NOT NULL
+  highest_triggered_percent REAL
+  last_used_percent REAL
+  PRIMARY KEY (account_id, window_kind)
 
 adapter_health
   provider_id TEXT PRIMARY KEY
   last_success_at TEXT
   last_error_kind TEXT
   consecutive_failures INTEGER NOT NULL
+  circuit_state TEXT NOT NULL
+  next_probe_at TEXT
+
+account_health
+  account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE
+  last_success_at TEXT
+  last_error_kind TEXT
+  consecutive_failures INTEGER NOT NULL
+  next_attempt_at TEXT
 ```
+
+约束和索引：
+
+- `alert_rules` 以 `NULL` 表示“全部账号/窗口”；通过四组 partial unique index 保证全局、
+  账号、窗口、账号+窗口四种作用域各只有一条规则，避免使用伪 UUID 或 `*` 哨兵值。
+- 规则优先级固定为：账号+窗口 > 账号 > 窗口 > 全局。
+- 告警阈值满足 `0 <= warning < high < critical <= 100`，通过数据库 `CHECK` 和领域校验
+  双重保证。
+- `alert_deliveries(account_id, window_kind, threshold, state_generation)` 唯一。
+- `quota_snapshots(account_id, fetched_at DESC)` 建索引。
+- 外键删除行为必须在 migration 中显式声明。
+- SQLite 每次连接启用 `foreign_keys=ON`、WAL 和 5 秒 `busy_timeout`；schema 只通过
+  `sqlx migrate` 演进。
 
 ### 9.2 历史保留
 
-默认：
+默认保留 30 天；用户可选择 7、90 天或不保存历史。启用历史时：
 
 - 最近 24 小时：保留每次成功快照。
-- 2–30 天：每小时保留一条。
-- 31–90 天：每天保留一条。
-- 90 天后删除快照。
+- 第 2 天至保留上限：每小时保留一条。
+- 选择 90 天时，第 31–90 天每天保留一条。
 
-清理只涉及监控快照，不删除账号或凭据。用户可选择 7、30、90 天或不保存历史。
+清理只涉及监控快照，不删除账号或凭据。
 
 ### 9.3 凭据
 
-Credential Manager 条目建议：
+秘密存储分两级：
 
 ```text
-service: AIQuotaMonitor
-account: <provider-id>/<local-account-uuid>
-secret:  provider-specific serialized secret
+wcm:   AIQuotaMonitor/<credential-uuid>
+dpapi: <absolute-path-to-encrypted-secret-file>
 ```
 
 安全要求：
 
+- Windows Credential Manager 的 Generic Credential blob 上限为 2560 bytes。序列化秘密
+  不超过 2400 bytes 时可保存到 WCM；超过阈值时使用 CurrentUser 范围 DPAPI 加密后写入
+  应用数据目录，并采用同目录临时文件 + 原子替换以及仅当前用户可读的 ACL。
+- 数据库只保存带 `wcm:` / `dpapi:` 前缀的 opaque reference，不保存秘密或加密载荷。
 - UI、日志和数据库永不返回完整秘密。
 - 更新凭据采用覆盖写，旧值不进入历史。
-- 删除账号时同时删除 Credential Manager 条目。
+- 删除最后一个账号引用时，由用户确认是否同时删除安全存储条目。
 - 导出诊断包不包含秘密。
 - 不采用“SQLite 加密字段 + 同目录 key.bin”的设计。
 
@@ -514,20 +600,29 @@ secret:  provider-specific serialized secret
 
 ### 10.2 去重
 
-每条告警使用以下去重键：
+告警使用“状态代次 + 阈值”去重，不把可能漂移的 `resetsAt` 当作周期身份：
 
 ```text
-account_id + window_kind + reset_cycle_key + threshold
+account_id + window_kind + state_generation + threshold
 ```
 
-`reset_cycle_key` 优先使用 `resetsAt`；重置时间缺失时，使用适配器提供的周期标识或首次观察
-时间生成保守键。相同周期、相同阈值不重复通知。
+规则如下：
+
+1. 每个账号窗口持久化当前 `state_generation` 和已触发的最高阈值。
+2. 用量向上跨越一个或多个阈值时，同一轮只投递最高级别，避免从 60% 跳到 96% 时连续
+   弹出三条通知。
+3. 用量降至 Warning 阈值以下至少 5 个百分点后，递增 `state_generation` 并重新武装。
+   这同时覆盖窗口正常重置及没有可靠 `resetsAt` 的供应商。
+4. 异常小幅回落不重新武装；Parser 必须保留上一成功值供判断。
+5. `alert_deliveries` 至少保留 180 天，以避免应用重启或历史快照清理导致短期重复通知。
 
 ### 10.3 特殊通知
 
 - 认证失效：首次检测时通知，之后每 24 小时最多提醒一次。
 - 数据陈旧：连续 3 次失败且最后成功数据超过 30 分钟时通知。
 - 恢复：认证或适配器从失败恢复时可选通知。
+- 静默时段仍写入 `alert_deliveries`，但不显示 Toast，静默结束后不补发。额度、认证、
+  陈旧和恢复通知都遵循同一静默规则。
 
 ## 11. UI 信息架构
 
@@ -566,13 +661,17 @@ GET /v1/accounts
 GET /v1/snapshots/latest
 ```
 
+MVP 同时提供“导出最新快照为 JSON”操作，复用脱敏后的领域 DTO，不包含凭据引用、账号
+身份字段或历史原始响应；该导出不要求启用本地 HTTP 接口。
+
 约束：
 
 - 默认关闭。
 - 仅绑定 `127.0.0.1`。
 - 拒绝非 loopback Host。
 - 返回额度数据，不返回 credential reference。
-- 如允许其他本机程序访问，使用随机本地 token。
+- 如允许其他本机程序访问，使用高熵随机本地 token；token 写入 Windows Credential
+  Manager，创建时只显示一次，之后只能轮换，不能从 UI 回显。
 
 这样可以支持 Rainmeter、命令行、Grafana Agent 或个人脚本，而不把桌面应用演变为代理网关。
 
@@ -594,6 +693,7 @@ GET /v1/snapshots/latest
 - 完整 Workspace ID。
 - 邮箱、用户名和组织名称。
 - 上游完整响应。
+- 未脱敏的用户目录绝对路径。
 
 允许记录：
 
@@ -602,6 +702,7 @@ GET /v1/snapshots/latest
 - allowlist 路径 ID。
 - 响应 schema 指纹。
 - 适配器版本和解析阶段。
+- 用户目录路径统一替换为 `<USERPROFILE>` 后的相对形式。
 
 ### 13.3 诊断导出
 
@@ -621,9 +722,11 @@ GET /v1/snapshots/latest
 
 - 百分比归一化。
 - 重置时间解析和时区转换。
-- 告警阈值和周期去重。
+- 告警阈值、状态代次、跨多阈值合并和静默时段投递。
 - 日志脱敏。
 - allowlist 和跨域重定向拒绝。
+- 新鲜度派生与自适应刷新迟滞。
+- 账号退避、认证暂停和供应商级 parser 熔断。
 
 ### 14.2 Parser Fixture
 
@@ -658,10 +761,13 @@ Live test 只验证：
 ### 14.4 集成测试
 
 - Credential Manager 写入、读取、覆盖和删除。
+- 超长 Cookie 的 DPAPI fallback、ACL、原子替换和引用计数删除。
 - SQLite migration。
+- SQLite 外键、WAL、busy timeout、唯一约束和级联删除。
 - 多账号并发和失败隔离。
 - 休眠/恢复。
 - Windows Toast 去重。
+- 单实例启动及第二次启动时唤起已有窗口。
 
 ### 14.5 UI 测试
 
@@ -677,10 +783,17 @@ Live test 只验证：
 
 - [ ] 所有上游请求使用 HTTPS。
 - [ ] 每个适配器有独立主机和路径 allowlist。
-- [ ] 跨域重定向不转发秘密。
+- [ ] HTTP client 未启用 cookie jar；Cookie/Authorization 只在请求发送前按凭据作用域注入。
+- [ ] 自动重定向关闭；手动跟随不超过 3 跳，每一跳重新执行 HTTPS、host、path 和 origin
+      校验，只有目标 origin 与凭据作用域完全匹配时才可重新注入秘密。
+- [ ] 系统代理不能绕过 allowlist；Phase 0 在 Windows 系统代理开启/关闭两种状态下验证。
 - [ ] 日志和错误对象通过统一 redactor。
 - [ ] SQLite 不含 Cookie/API Key。
 - [ ] 凭据删除可验证。
+- [ ] 前后端 IPC 中秘密只允许 UI → Rust 单向提交，Rust 返回值和事件不得包含秘密、
+      `credentialRef` 或可逆片段。
+- [ ] DPAPI fallback 文件仅当前用户可读，写入采用原子替换。
+- [ ] 单实例锁生效，第二个进程不能同时写 SQLite。
 - [ ] 应用卸载说明包含本地数据和 Credential Manager 清理入口。
 - [ ] 更新包具备签名和校验信息。
 - [ ] 依赖安全审计无高危未处理项。
@@ -713,6 +826,8 @@ Live test 只验证：
 - 脱敏响应结构记录。
 - 字段映射和认证方式验证。
 - 明确每个请求的 host、path、method。
+- 验证 Windows 系统代理开启/关闭时的请求行为、证书信任和 allowlist 不变量。
+- 记录每个供应商的重置语义：绝对周期、滑动窗口或未知；未知时不得臆造周期 ID。
 
 退出条件：
 
@@ -757,13 +872,13 @@ Live test 只验证：
 
 - Windows Toast。
 - 阈值规则。
-- 告警周期去重。
+- 告警状态代次去重。
 - 7/30/90 天趋势。
 
 退出条件：
 
-- 相同周期不重复轰炸。
-- 窗口重置后正确开始新周期。
+- 同一状态代次不重复轰炸。
+- 窗口重置或明确回落后正确重新武装。
 
 ### Phase 4：发布硬化
 
@@ -786,6 +901,8 @@ Live test 只验证：
 - [ ] 展示重置时间和最后成功时间。
 - [ ] 支持账号级暂停和凭据更新。
 - [ ] 支持 Warning/High/Critical 通知。
+- [ ] 支持导出脱敏后的最新快照 JSON。
+- [ ] 支持开机自启开关，默认关闭。
 
 可靠性：
 
@@ -793,6 +910,7 @@ Live test 只验证：
 - [ ] Cookie 失效不会覆盖最后成功快照。
 - [ ] 429 不导致紧密重试。
 - [ ] 应用重启后保留账号配置、历史和告警去重状态。
+- [ ] 第二次启动只唤起已有实例，不产生并行调度器。
 
 安全：
 
@@ -829,17 +947,16 @@ Live test 只验证：
 └─ package.json
 ```
 
-## 20. 首轮实现前的待确认项
+## 20. 已确认的首版产品决策
 
-以下选择不会阻塞 Phase 0，但应在桌面 UI 开始前确定：
-
-1. 产品名称是否沿用 `AI Quota Monitor`。
-2. 首版是否严格 Windows-only，还是同时产出 Linux CLI。
-3. 默认刷新周期采用 5 分钟还是 15 分钟。
-4. 是否需要 90 天历史，还是默认只保留 30 天。
-5. Ollama/OpenCode Cookie 首版是否只允许手工输入。
-6. 是否在 MVP 中加入只读 JSON 导出。
-7. 是否需要系统启动时自动运行。
+1. 产品名称沿用 `AI Quota Monitor`。
+2. 首版严格 Windows-only；其他平台不进入 MVP 交付范围。
+3. 基础刷新周期 15 分钟，并按 §6.2 在接近阈值时自适应提高到 5 分钟。
+4. 历史默认保留 30 天，可选 7、90 天或不保存。
+5. Ollama Cloud 和 OpenCode Go Cookie 首版只允许用户手工输入；浏览器自动读取后置且
+   必须显式授权。
+6. MVP 包含脱敏后的最新快照 JSON 导出。
+7. 支持系统启动时自动运行，默认关闭。
 
 ## 21. 参考实现与外部依据
 

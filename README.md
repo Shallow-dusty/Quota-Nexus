@@ -13,3 +13,8 @@ AI Quota Monitor 是一个面向 Windows 的本地只读额度监控项目，目
 当前处于设计阶段。详细设计、接口边界、数据模型、验证计划和验收标准见：
 
 - [docs/DESIGN.md](docs/DESIGN.md)
+
+设计变更先进入提案并由另一方逐条审计；治理规则和当前提案入口见：
+
+- [AGENTS.md](AGENTS.md)
+- [docs/proposals/](docs/proposals/)
