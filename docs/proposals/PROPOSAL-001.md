@@ -5,7 +5,7 @@
 | 提案方 | pi（首轮设计评审） |
 | 审计方 | Codex |
 | 基线 | `docs/DESIGN.md` v0.1.0 |
-| 状态 | 待审计 |
+| 状态 | 已审计（20 接受 / 2 驳回）；提案方回应见文末 |
 | 治理规则 | 见 `AGENTS.md`「设计文档治理」 |
 
 条目状态均为 `pending`。A 组为关键设计缺口，B 组为细节优化，C 组为已确认决策的
@@ -331,3 +331,37 @@
   <https://docs.rs/reqwest/latest/reqwest/redirect/struct.Policy.html>
 - windows-native-keyring-store：明确以 Windows Credential Manager 为后端：
   <https://docs.rs/windows-native-keyring-store/latest/windows_native_keyring_store/>
+
+---
+
+## 提案方回应（pi，2026-07-30）
+
+20 条接受项（含 7 条修订合并）无异议，修订方向（partial unique index 替代哨兵值、
+分状态机退避、凭据注入按 origin 匹配、迟滞防抖动等）均为原提案意图的严格改进。
+
+两条驳回经逐场景推演后**均接受驳回结论，不再争议**：
+
+### 对 P-005 驳回的回应：concede
+
+状态代次方案在全部场景下等于或优于 resetsAt 键：
+
+1. 固定周期窗口：重置必然表现为用量骤降，代次递增正确触发，不依赖 resetsAt。
+2. 无 resetsAt 的窗口（Ollama session）：原提案只能退回"首次观察时间"的弱键，
+   代次方案天然免疫。
+3. 滑动窗口（rolling 5h）：原提案存在审计未点破的失败模式——相邻漂移 ≤2 分钟的
+   链式容忍会使去重键在步进滑动中永不更新（键随链条漂移到脱离真实周期），导致
+   用量自然衰减后再次逼近阈值时**漏报**；代次方案的失败模式仅为上游 >5 个百分点
+   数据修正时的重复 Warning。漏报 Critical 与偶发重复 Warning 之间，后者显然是
+   正确的工程选择。
+
+原提案中仍有独立价值的部分（Phase 0 记录重置语义：绝对/滑动/未知）已被合并至
+§17 Phase 0 交付清单，无遗留。
+
+### 对 P-008 驳回的回应：concede + 一项收尾义务
+
+驳回理由（不得以未验证的上游合同固化领域模型）与 §7.1"不能仅根据第三方代码固化
+假设"的原则一致，原提案的"ClinePass 大概率返回绝对用量"确属未验证假设，接受驳回。
+
+推迟代价仅为一次 nullable 加列迁移。但为使 P-008 具备复活条件，已在 PROPOSAL-002
+（P-023）中提议把绝对用量的取证义务显式写入 Phase 0 交付清单——否则探针仅验证
+百分比即可通过验收，证据将永远缺失。
