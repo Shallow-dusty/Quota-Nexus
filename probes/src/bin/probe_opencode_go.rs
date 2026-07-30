@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     let cookie = cred
         .map(|c| c.cookie.trim().to_string())
         .filter(|c| !c.is_empty());
-    let configured_ws = cred.and_then(|c| c.workspace_id.clone());
+    let configured_ws = normalize_workspace_id(cred.and_then(|c| c.workspace_id.as_deref()));
 
     // ---- 请求 1: workspaces RPC ----
     let url1 = format!("{SERVER_URL}?id={WORKSPACES_ID}");
@@ -217,6 +217,13 @@ fn server_headers(cookie: Option<&str>) -> Vec<(String, String)> {
     h
 }
 
+fn normalize_workspace_id(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|workspace| !workspace.is_empty())
+        .map(str::to_string)
+}
+
 fn extract_workspace_ids(body: &str) -> Vec<String> {
     let re = Regex::new(r"wrk_[A-Za-z0-9]+").expect("常量正则");
     let mut out: Vec<String> = Vec::new();
@@ -312,5 +319,21 @@ fn grab_window(body: &str, window: &str) -> Option<serde_json::Value> {
             "usage_percent_raw": pct,
             "reset_in_sec": reset,
         })),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_workspace_id;
+
+    #[test]
+    fn blank_workspace_is_treated_as_missing() {
+        assert_eq!(normalize_workspace_id(None), None);
+        assert_eq!(normalize_workspace_id(Some("")), None);
+        assert_eq!(normalize_workspace_id(Some("   ")), None);
+        assert_eq!(
+            normalize_workspace_id(Some("  wrk_example  ")),
+            Some("wrk_example".to_string())
+        );
     }
 }

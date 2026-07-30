@@ -71,7 +71,10 @@ fn walk(value: &Value, path: &str, keys: &[&str], hits: &mut Vec<String>) {
                     format!("{path}.{k}")
                 };
                 let lk = k.to_lowercase();
-                if v.is_number() && keys.iter().any(|c| lk.contains(c)) {
+                let is_percentage = ["percent", "ratio"]
+                    .iter()
+                    .any(|marker| lk.contains(marker));
+                if v.is_number() && !is_percentage && keys.iter().any(|c| lk.contains(c)) {
                     hits.push(child.clone());
                 }
                 walk(v, &child, keys, hits);
@@ -152,4 +155,25 @@ pub fn html_usage_evidence(html: &str, redact: &crate::redact::Redactor) -> Valu
         "plan_tokens_found": plan_tokens,
         "has_cloud_usage_marker": html.contains("Cloud Usage"),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scan_absolute_amount_fields;
+    use serde_json::json;
+
+    #[test]
+    fn absolute_amount_scan_excludes_percentages() {
+        let value = json!({
+            "percentUsed": 99,
+            "usageRate": 0.99,
+            "creditsUsed": 120,
+            "remainingTokens": 880
+        });
+
+        assert_eq!(
+            scan_absolute_amount_fields(&value),
+            vec!["creditsUsed", "remainingTokens"]
+        );
+    }
 }

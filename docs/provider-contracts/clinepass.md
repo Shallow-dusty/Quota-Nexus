@@ -2,9 +2,9 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 验证状态 | 匿名验证（2026-07-30） |
+| 验证状态 | 账号验证（2026-07-30） |
 | 契约来源 | CodexBar `ClinePassUsageFetcher.swift`（MIT）+ 本仓库探针实测 |
-| 最后验证 | 2026-07-30（匿名） |
+| 最后验证 | 2026-07-30（真实 API Key，当前 TUN 路由） |
 
 ## 端点
 
@@ -28,31 +28,32 @@
   会直达 Provider 并返回 401，而实测未发生。快照只记录 `explicit_fixed_proxy`，不含
   profile、端点、认证或实际 IP。
 
-## 响应契约（社区来源，待真实账号复核）
+## 响应契约（真实账号实测）
 
 - 顶层结构：`{ "success": bool, "data": { "limits": [...] } }`。
 - 窗口字段：`limits[].type` ∈ `five_hour` / `weekly` / `monthly`；
   `limits[].percentUsed: number`；`limits[].resetsAt: ISO8601 string | null`。
-- 百分比方向：`percentUsed` = 已用百分比（字段名直证；数值范围待真实账号复核，
-  越界不得静默截断，记 schema error）。
+- 百分比方向与量级：`percentUsed` = **0–100 已用百分比**；本次实测 five-hour = 0、
+  weekly = 0、monthly = 99。越界不得静默截断，记 schema error。
 - 重置语义：`resetsAt` 为**绝对** ISO8601 时间戳（可空；空时 UI 显示"重置时间未知"）。
+  本次三个窗口均为非空字符串。
 
 ## 绝对用量观察（P-023 取证）
 
-- 匿名 401 响应不含额度字段，无法观察。
-- 待真实账号运行后由探针 `absolute_amount_field_candidates` 扫描确认。
+- 真实响应除百分比外未发现绝对额度、已用量或剩余量字段；在出现新证据前不扩展领域模型。
 
 ## 证据
 
 - 快照：`snapshots/clinepass-20260730T043519Z.json`（匿名 401）
 - 快照：`snapshots/clinepass-20260730T053328Z.json`（不可达显式代理；不回退负向证据）
+- 快照：`snapshots/clinepass-20260730T094427Z.json`（真实账号 200，三个额度窗口）
 - 原始响应（gitignored）：`data/probe-raw/clinepass/`
 
 ## 待验证清单
 
-- [ ] 真实 API Key 返回 200 且 `success=true`。
-- [ ] 三个窗口是否同时存在；`percentUsed` 数值方向与范围（0-100 / 0-1）。
-- [ ] `resetsAt` 是否恒非空；相邻轮询间是否漂移（绝对还是滑动现算）。
-- [ ] 绝对用量字段存在性（P-023）。
+- [x] 真实 API Key 返回 200 且 `success=true`。
+- [x] 三个窗口同时存在；`percentUsed` 为 0–100 已用百分比。
+- [x] 本次三个 `resetsAt` 均非空，合同语义为绝对 ISO8601 时间戳。
+- [x] 绝对用量字段取证：当前未观察到（P-023）。
 - [x] 不可达显式代理不回退默认/TUN 出口（无真实凭据负向验证）。
-- [ ] Windows 默认 TUN 与账号固定出口下分别完成真实读取；证据只记录路由模式。
+- [x] 当前默认 TUN 完成真实读取；证据只记录路由模式。

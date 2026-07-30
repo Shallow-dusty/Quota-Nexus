@@ -4,7 +4,7 @@
 | --- | --- |
 | 验证状态 | 账号验证（2026-07-30） |
 | 契约来源 | CodexBar `OpenCodeGoUsageFetcher.swift`（MIT）+ 本仓库探针实测 |
-| 最后验证 | 2026-07-30（真实 Cookie，当前 TUN 路由） |
+| 最后验证 | 2026-07-30（两个真实 Cookie，当前 TUN 路由） |
 
 ## 端点
 
@@ -43,7 +43,8 @@
   `usagePercent: number` 与 `resetInSec: number`；本次三类窗口均存在。
 - 百分比方向与量级已确认：`usagePercent` = 已用，当前账号原始值为 **0–100 百分比**：
   rolling 5h = 3、weekly = 84、monthly = 42。仍保留社区实现的 `≤1 → ×100`
-  兼容逻辑，以应对服务端不同版本。
+  兼容逻辑，以应对服务端不同版本。第二个独立会话实测为 rolling 5h = 0、
+  weekly = 86、monthly = 44，方向和量级一致。
 - 重置语义：`resetInSec` 为**相对秒数（滑动）**，重置时刻 = `now + resetInSec`
   由客户端现算——与 DESIGN.md 状态代次去重决策一致，不得把 resetsAt 当周期身份；
   相邻轮询的递减形态仍待复测。
@@ -57,11 +58,12 @@
 
 - 快照：`snapshots/opencode-go-20260730T043523Z.json`（匿名：RPC 200 + 未登录标记）
 - 快照：`snapshots/opencode-go-20260730T093234Z.json`（真实账号 200，workspace 已脱敏）
+- 快照：`snapshots/opencode-go-20260730T093945Z.json`（第二个真实账号，自动发现 workspace）
 - 原始响应（gitignored）：`data/probe-raw/opencode-go/`
 
 ## 待验证清单
 
-- [x] 真实 Cookie 下 workspaces RPC 返回 1 个 `wrk_…` workspace。
+- [x] 两个真实 Cookie 均由 workspaces RPC 返回 1 个 `wrk_…` workspace。
 - [x] Go 用量页命中 rollingUsage、weeklyUsage 与 monthlyUsage。
 - [x] `usagePercent` 原值为 0–100 已用百分比。
 - [ ] `resetInSec` 相邻轮询漂移形态（验证滑动推断）。

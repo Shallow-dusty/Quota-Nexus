@@ -69,12 +69,15 @@
 .\probes\import-request-headers.ps1 -Provider ollama_cloud
 .\probes\import-request-headers.ps1 -Provider opencode_go -NetworkProfile opencode-login-ip
 .\probes\import-request-headers.ps1 -Provider opencode_go -WorkspaceId wrk_...
+.\probes\import-request-headers.ps1 -Provider opencode_go `
+  -CredentialsPath .\probes\credentials.local.opencode-go-2.json
 ```
 
 脚本只接受匹配 Provider 域名的请求头，提取 Cookie 后原子更新 gitignored 的
 `credentials.local.json`，不回显 Cookie，并保留其他 Provider 与代理配置。OpenCode Go
 请求头若含 `/workspace/wrk_.../` Referer，脚本会自动提取 workspace；顶层 document
-请求不含 Referer 时可通过 `-WorkspaceId` 指定。
+请求不含 Referer 时可通过 `-WorkspaceId` 指定。Phase 0 验证多个账号时，为每份 Credential
+指定独立的 `-CredentialsPath`；探针运行时传入同一路径，避免覆盖其他账号。
 
 ## 运行
 

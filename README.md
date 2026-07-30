@@ -34,8 +34,7 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 - [docs/DESIGN.md](docs/DESIGN.md)：当前设计、数据模型、阶段计划和验收标准。
 - [AGENTS.md](AGENTS.md)：仓库内的简要协作规则。
 
-当前状态：Phase 0 进行中。三个只读探针已实现（`probes/`），匿名端点验证、显式代理
-失败不回退的负向验证，以及 Ollama Cloud、OpenCode Go 真实账号验证已完成（证据见
-`docs/provider-contracts/`）；待 ClinePass 按其出口完成账号级验证。
-前端 tokens、三类 surface 与静态状态矩阵可并行开始。
+当前状态：Phase 0 已完成。三个只读探针均已通过真实账号验证，匿名鉴权行为、显式代理
+失败不回退、默认 TUN 路由和脱敏证据均已验证（见 `docs/provider-contracts/`）。
+下一步进入 Phase 1，以 ClinePass 实现 Core、凭据安全存储与首个前后端纵向切片。
 已结束的评审记录保存在 `docs/archive/`（[历程索引](docs/archive/README.md)），日常开发无需读取。

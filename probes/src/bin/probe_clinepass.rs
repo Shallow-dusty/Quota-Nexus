@@ -149,7 +149,7 @@ fn classify_ok(r: &mut RequestReport, body: &str) {
         "windows": windows,
         "absolute_amount_field_candidates": absolute_candidates,
         "reset_semantics": "resetsAt 绝对 ISO8601 时间戳（可空）",
-        "percent_direction": "percentUsed = 已用百分比（字段名直证，待真实账号复核数值方向）",
+        "percent_direction": "percentUsed = 0–100 已用百分比（真实账号实测）",
     });
 
     if success && !windows.is_empty() {

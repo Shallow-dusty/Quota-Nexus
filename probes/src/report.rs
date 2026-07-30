@@ -116,12 +116,12 @@ impl ProbeReport {
 
     pub fn compute_verdict(&mut self) {
         let has = |c: Classification| self.requests.iter().any(|r| r.classification == c);
-        self.verdict = if has(Classification::Success) {
-            "success"
-        } else if has(Classification::ParseError) {
+        self.verdict = if has(Classification::ParseError) {
             "parse_error"
         } else if has(Classification::AuthExpired) {
             "auth_expired"
+        } else if has(Classification::NetworkError) || has(Classification::Unexpected) {
+            "network_or_unexpected"
         } else if has(Classification::ExpectedRejection) {
             "endpoint_reachable_auth_required"
         } else if self
@@ -130,6 +130,8 @@ impl ProbeReport {
             .all(|r| r.classification == Classification::Skipped)
         {
             "skipped"
+        } else if has(Classification::Success) {
+            "success"
         } else {
             "network_or_unexpected"
         }
@@ -207,4 +209,42 @@ fn file_stamp() -> String {
     OffsetDateTime::now_utc()
         .format(&fmt)
         .unwrap_or_else(|_| "unknown".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Classification, ProbeReport, RequestReport};
+
+    fn request(seq: usize, classification: Classification) -> RequestReport {
+        let mut request = RequestReport::new(seq, "test", "GET", "https://example.com/", true);
+        request.classification = classification;
+        request
+    }
+
+    #[test]
+    fn partial_success_does_not_hide_auth_failure() {
+        let mut report = ProbeReport::new("test");
+        report.push(request(1, Classification::Success));
+        report.push(request(2, Classification::AuthExpired));
+        report.compute_verdict();
+        assert_eq!(report.verdict, "auth_expired");
+    }
+
+    #[test]
+    fn partial_success_does_not_hide_parse_failure() {
+        let mut report = ProbeReport::new("test");
+        report.push(request(1, Classification::Success));
+        report.push(request(2, Classification::ParseError));
+        report.compute_verdict();
+        assert_eq!(report.verdict, "parse_error");
+    }
+
+    #[test]
+    fn all_success_remains_success() {
+        let mut report = ProbeReport::new("test");
+        report.push(request(1, Classification::Success));
+        report.push(request(2, Classification::Success));
+        report.compute_verdict();
+        assert_eq!(report.verdict, "success");
+    }
 }

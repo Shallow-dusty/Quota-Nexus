@@ -1,0 +1,66 @@
+{
+  "provider": "clinepass",
+  "probe_version": "0.1.0",
+  "started_at_utc": "2026-07-30T09:44:26.828370967Z",
+  "proxy_env_detected": [],
+  "requests": [
+    {
+      "seq": 1,
+      "purpose": "usage-limits",
+      "method": "GET",
+      "host": "api.cline.bot",
+      "path": "/api/v1/users/me/plan/usage-limits",
+      "query": "none",
+      "authenticated": true,
+      "status": 200,
+      "content_type": "application/json",
+      "redirect_location": null,
+      "classification": "success",
+      "evidence": [
+        "原始响应(未脱敏): /mnt/e/coding/06.AI-Quota-Monitor/data/probe-raw/clinepass/20260730T094427Z-seq1.txt",
+        "success=true，3 个额度窗口"
+      ],
+      "fingerprint": {
+        "data": {
+          "limits": [
+            {
+              "percentUsed": "<number>",
+              "resetsAt": "<string>",
+              "type": "<string>"
+            },
+            "..共 3 项"
+          ]
+        },
+        "success": "<bool>"
+      },
+      "extracted": {
+        "absolute_amount_field_candidates": [],
+        "percent_direction": "percentUsed = 0–100 已用百分比（真实账号实测）",
+        "reset_semantics": "resetsAt 绝对 ISO8601 时间戳（可空）",
+        "success_field": true,
+        "windows": [
+          {
+            "percent_used": 0.0,
+            "resets_at_present": true,
+            "type": "five_hour"
+          },
+          {
+            "percent_used": 0.0,
+            "resets_at_present": true,
+            "type": "weekly"
+          },
+          {
+            "percent_used": 99.0,
+            "resets_at_present": true,
+            "type": "monthly"
+          }
+        ]
+      }
+    }
+  ],
+  "verdict": "success",
+  "notes": [
+    "契约起点: CodexBar ClinePassUsageFetcher.swift (MIT)",
+    "network_route=default_tun_or_process_route"
+  ]
+}
