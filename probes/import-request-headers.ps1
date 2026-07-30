@@ -6,7 +6,9 @@ param(
 
     [string]$CredentialsPath,
 
-    [string]$NetworkProfile
+    [string]$NetworkProfile,
+
+    [string]$WorkspaceId
 )
 
 $ErrorActionPreference = "Stop"
@@ -113,8 +115,23 @@ elseif (-not $config[$Provider].Contains("network_profile")) {
     $config[$Provider]["network_profile"] = $null
 }
 
-if ($Provider -eq "opencode_go" -and -not $config[$Provider].Contains("workspace_id")) {
-    $config[$Provider]["workspace_id"] = ""
+if ($Provider -eq "opencode_go") {
+    $refererValue = ($headerRows |
+            Where-Object { $_.name -ieq "Referer" } |
+            Select-Object -First 1).value
+    $workspaceFromReferer = if ($refererValue -match "/workspace/(wrk_[^/?#]+)") {
+        $Matches[1]
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($WorkspaceId)) {
+        $config[$Provider]["workspace_id"] = $WorkspaceId
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($workspaceFromReferer)) {
+        $config[$Provider]["workspace_id"] = $workspaceFromReferer
+    }
+    elseif (-not $config[$Provider].Contains("workspace_id")) {
+        $config[$Provider]["workspace_id"] = ""
+    }
 }
 if (-not $config.Contains("network_profiles")) {
     $config["network_profiles"] = [ordered]@{}

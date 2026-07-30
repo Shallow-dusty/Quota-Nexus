@@ -2,9 +2,9 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 验证状态 | 匿名验证（2026-07-30） |
+| 验证状态 | 账号验证（2026-07-30） |
 | 契约来源 | CodexBar `OpenCodeGoUsageFetcher.swift`（MIT）+ 本仓库探针实测 |
-| 最后验证 | 2026-07-30（匿名） |
+| 最后验证 | 2026-07-30（真实 Cookie，当前 TUN 路由） |
 
 ## 端点
 
@@ -37,31 +37,33 @@
 - 未绑定时使用普通 socket，由当前系统网络栈/TUN 接管；显式出口失败不得回退。
 - 快照只记录路由模式，不记录 profile、端点、认证或实际 IP。
 
-## 响应契约（社区来源，待真实账号复核）
+## 响应契约（真实账号实测）
 
 - 窗口字段：`rollingUsage` / `weeklyUsage` / `monthlyUsage` 各自包含
-  `usagePercent: number` 与 `resetInSec: number`；rolling 必需，weekly/monthly 可选。
-- 百分比方向：`usagePercent` = 已用；**原始值可能是 0-1 分数或 0-100 百分比**
-  （社区实现含 `≤1 → ×100` 启发式），真实账号运行时必须记录原值判定。
+  `usagePercent: number` 与 `resetInSec: number`；本次三类窗口均存在。
+- 百分比方向与量级已确认：`usagePercent` = 已用，当前账号原始值为 **0–100 百分比**：
+  rolling 5h = 3、weekly = 84、monthly = 42。仍保留社区实现的 `≤1 → ×100`
+  兼容逻辑，以应对服务端不同版本。
 - 重置语义：`resetInSec` 为**相对秒数（滑动）**，重置时刻 = `now + resetInSec`
-  由客户端现算——与 DESIGN.md 状态代次去重决策一致，不得把 resetsAt 当周期身份。
+  由客户端现算——与 DESIGN.md 状态代次去重决策一致，不得把 resetsAt 当周期身份；
+  相邻轮询的递减形态仍待复测。
 
 ## 绝对用量观察（P-023 取证）
 
-- 匿名响应不含额度字段，无法观察；待真实账号运行（页面含 `quota/credits/tokens`
-  等 key 的存在性扫描由探针记录）。
+- 页面存在 `credits` / `balance` key，但本次探针未提取到可归属当前账号的绝对额度值；
+  暂不扩展领域模型，等待定向取证。
 
 ## 证据
 
 - 快照：`snapshots/opencode-go-20260730T043523Z.json`（匿名：RPC 200 + 未登录标记）
+- 快照：`snapshots/opencode-go-20260730T093234Z.json`（真实账号 200，workspace 已脱敏）
 - 原始响应（gitignored）：`data/probe-raw/opencode-go/`
 
 ## 待验证清单
 
-- [ ] 真实 Cookie 下 workspaces RPC 返回 `wrk_…` 列表（多 workspace 场景枚举完整）。
-- [ ] Go 用量页命中 rollingUsage（必需）及 weekly/monthly（记录存在性）。
-- [ ] `usagePercent` 原值量级（0-1 / 0-100）与方向。
+- [x] 真实 Cookie 下 workspaces RPC 返回 1 个 `wrk_…` workspace。
+- [x] Go 用量页命中 rollingUsage、weeklyUsage 与 monthlyUsage。
+- [x] `usagePercent` 原值为 0–100 已用百分比。
 - [ ] `resetInSec` 相邻轮询漂移形态（验证滑动推断）。
-- [ ] 绝对用量字段存在性（P-023）。
-- [ ] 页面重定向行为与 allowlist 不变量。
-- [ ] Windows 上以创建登录会话时的固定出口完成真实读取；显式出口失败不回退。
+- [x] 绝对用量字段初步取证：存在 key，未提取到账号绝对值（P-023）。
+- [x] 当前 TUN 下页面直返 200；allowlist 不变量与显式出口失败不回退已有独立证据。

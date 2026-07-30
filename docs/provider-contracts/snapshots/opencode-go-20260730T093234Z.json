@@ -1,0 +1,88 @@
+{
+  "provider": "opencode-go",
+  "probe_version": "0.1.0",
+  "started_at_utc": "2026-07-30T09:32:28.697553996Z",
+  "proxy_env_detected": [],
+  "requests": [
+    {
+      "seq": 1,
+      "purpose": "workspaces-rpc",
+      "method": "GET",
+      "host": "opencode.ai",
+      "path": "/_server",
+      "query": "present(redacted)",
+      "authenticated": true,
+      "status": 200,
+      "content_type": "text/javascript",
+      "redirect_location": null,
+      "classification": "success",
+      "evidence": [
+        "原始响应(未脱敏): /mnt/e/coding/06.AI-Quota-Monitor/data/probe-raw/opencode-go/20260730T093229Z-seq1.txt",
+        "发现 1 个 workspace（值已脱敏）"
+      ],
+      "fingerprint": null,
+      "extracted": {
+        "workspace_count": 1
+      }
+    },
+    {
+      "seq": 2,
+      "purpose": "go-usage-page",
+      "method": "GET",
+      "host": "opencode.ai",
+      "path": "/workspace/wrk_***/go",
+      "query": "none",
+      "authenticated": true,
+      "status": 200,
+      "content_type": "text/html",
+      "redirect_location": null,
+      "classification": "success",
+      "evidence": [
+        "原始响应(未脱敏): /mnt/e/coding/06.AI-Quota-Monitor/data/probe-raw/opencode-go/20260730T093234Z-seq2.txt",
+        "rollingUsage 命中；weekly=true monthly=true"
+      ],
+      "fingerprint": {
+        "js_key_presence": [
+          "rollingUsage",
+          "weeklyUsage",
+          "monthlyUsage",
+          "usagePercent",
+          "resetInSec",
+          "credits",
+          "balance"
+        ]
+      },
+      "extracted": {
+        "key_presence": [
+          "rollingUsage",
+          "weeklyUsage",
+          "monthlyUsage",
+          "usagePercent",
+          "resetInSec",
+          "credits",
+          "balance"
+        ],
+        "monthly": {
+          "reset_in_sec": 2599728,
+          "usage_percent_raw": 42.0
+        },
+        "percent_magnitude_note": "原始值可能为 0-1 分数或 0-100 百分比，快照记录原值供方向判定",
+        "reset_semantics": "resetInSec 相对秒数（滑动；resetsAt = now + resetInSec 由客户端现算）",
+        "rolling_5h": {
+          "reset_in_sec": 14264,
+          "usage_percent_raw": 3.0
+        },
+        "weekly": {
+          "reset_in_sec": 311250,
+          "usage_percent_raw": 84.0
+        }
+      }
+    }
+  ],
+  "verdict": "success",
+  "notes": [
+    "契约起点: CodexBar OpenCodeGoUsageFetcher.swift (MIT)",
+    "resetInSec 为相对秒数；resetsAt 由客户端按 now+resetInSec 现算（滑动语义）",
+    "network_route=default_tun_or_process_route"
+  ]
+}
