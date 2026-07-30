@@ -1,0 +1,32 @@
+{
+  "provider": "ollama-cloud",
+  "probe_version": "0.1.0",
+  "started_at_utc": "2026-07-30T04:35:19.83012034Z",
+  "proxy_env_detected": [],
+  "requests": [
+    {
+      "seq": 1,
+      "purpose": "settings-page",
+      "method": "GET",
+      "host": "ollama.com",
+      "path": "/settings",
+      "query": "none",
+      "authenticated": false,
+      "status": 303,
+      "content_type": "text/html; charset=utf-8",
+      "redirect_location": "/signin",
+      "classification": "expected_rejection",
+      "evidence": [
+        "原始响应(未脱敏): /mnt/e/coding/06.AI-Quota-Monitor/data/probe-raw/ollama-cloud/20260730T043521Z-seq1.txt",
+        "HTTP 303 → Location: /signin"
+      ],
+      "fingerprint": null,
+      "extracted": {}
+    }
+  ],
+  "verdict": "endpoint_reachable_auth_required",
+  "notes": [
+    "契约起点: CodexBar docs/ollama.md / OllamaUsageParser (MIT)",
+    "不依赖单一 cookie 名：完整发送用户提供的 Cookie header"
+  ]
+}

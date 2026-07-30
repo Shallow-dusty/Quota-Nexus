@@ -33,6 +33,7 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 - [docs/DESIGN.md](docs/DESIGN.md)：当前设计、数据模型、阶段计划和验收标准。
 - [AGENTS.md](AGENTS.md)：仓库内的简要协作规则。
 
-当前状态：前后端设计基线已完成，尚未开始编码；下一步是用三个轻量探针验证真实额度
-接口，并可并行建立与供应商无关的前端 tokens、三类 surface 和静态状态矩阵。
+当前状态：Phase 0 进行中。三个只读探针已实现（`probes/`），匿名端点验证已完成
+（鉴权行为证据见 `docs/provider-contracts/`）；待真实凭据运行完成账号级验证。
+前端 tokens、三类 surface 与静态状态矩阵可并行开始。
 已结束的评审记录保存在 `docs/archive/`（[历程索引](docs/archive/README.md)），日常开发无需读取。

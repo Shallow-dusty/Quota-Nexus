@@ -33,3 +33,6 @@ diagnostics/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Phase 0 probes: 凭据与原始响应禁止入库
+probes/credentials.local.json

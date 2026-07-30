@@ -1,0 +1,31 @@
+{
+  "provider": "clinepass",
+  "probe_version": "0.1.0",
+  "started_at_utc": "2026-07-30T04:35:18.151512332Z",
+  "proxy_env_detected": [],
+  "requests": [
+    {
+      "seq": 1,
+      "purpose": "usage-limits",
+      "method": "GET",
+      "host": "api.cline.bot",
+      "path": "/api/v1/users/me/plan/usage-limits",
+      "query": "none",
+      "authenticated": false,
+      "status": 401,
+      "content_type": "application/json",
+      "redirect_location": null,
+      "classification": "expected_rejection",
+      "evidence": [
+        "原始响应(未脱敏): /mnt/e/coding/06.AI-Quota-Monitor/data/probe-raw/clinepass/20260730T043519Z-seq1.txt",
+        "HTTP 401"
+      ],
+      "fingerprint": null,
+      "extracted": {}
+    }
+  ],
+  "verdict": "endpoint_reachable_auth_required",
+  "notes": [
+    "契约起点: CodexBar ClinePassUsageFetcher.swift (MIT)"
+  ]
+}
