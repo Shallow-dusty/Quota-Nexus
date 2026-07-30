@@ -3,6 +3,9 @@ node_modules/
 dist/
 .vite/
 coverage/
+output/
+.playwright-cli/
+*.tsbuildinfo
 
 # Rust / Tauri
 target/

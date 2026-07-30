@@ -36,5 +36,8 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 
 当前状态：Phase 0 已完成。三个只读探针均已通过真实账号验证，匿名鉴权行为、显式代理
 失败不回退、默认 TUN 路由和脱敏证据均已验证（见 `docs/provider-contracts/`）。
-下一步进入 Phase 1，以 ClinePass 实现 Core、凭据安全存储与首个前后端纵向切片。
+Phase 1 前端静态矩阵已重建：token 体系、三类材质（StableSurface/ControlGlass/
+FloatingGlass）、Overview/Accounts/Settings 三页、五种数据状态与添加账号分步 Dialog，
+当前由 Phase 0 脱敏样本驱动 UI 验收；下一步接入 Tauri Core、Windows Credential
+Manager 与 ClinePass 实时刷新，完成首个前后端纵向切片。
 已结束的评审记录保存在 `docs/archive/`（[历程索引](docs/archive/README.md)），日常开发无需读取。
