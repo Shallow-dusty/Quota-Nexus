@@ -18,6 +18,7 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 | --- | --- |
 | 产品形态 | Windows 优先的 Tauri 2 本地桌面应用 |
 | 前后端 | React + TypeScript UI，Rust Core，SQLite |
+| 前端体验 | Windows Liquid Glass 风格；三层材质、三页面 MVP、React Aria 单一行为层 |
 | 账号模型 | 三家供应商、多账号；凭据与账号 N:1，可让一个登录态覆盖多个 Workspace |
 | 数据采集 | 首期通过额度 API 或 Dashboard；以后可接入客户端或请求链路数据 |
 | 调度 | 默认 15 分钟；达到 Warning 后提高到 5 分钟，带迟滞、退避和供应商级熔断 |
@@ -32,5 +33,6 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 - [docs/DESIGN.md](docs/DESIGN.md)：当前设计、数据模型、阶段计划和验收标准。
 - [AGENTS.md](AGENTS.md)：仓库内的简要协作规则。
 
-当前状态：设计基线已完成，尚未开始编码；下一步是用三个轻量探针验证真实额度接口。
+当前状态：前后端设计基线已完成，尚未开始编码；下一步是用三个轻量探针验证真实额度
+接口，并可并行建立与供应商无关的前端 tokens、三类 surface 和静态状态矩阵。
 已结束的评审记录保存在 `docs/archive/`，日常开发无需读取。
