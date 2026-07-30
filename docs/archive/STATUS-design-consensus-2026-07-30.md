@@ -31,4 +31,4 @@ Phase 0 退出门：三个供应商各至少一个真实账号成功读取额度
 - 当前状态：本文件
 - 执行约束：`AGENTS.md`
 - 设计与验收：`docs/DESIGN.md`
-- 决策历史：`docs/proposals/`
+- 决策历史：`docs/archive/`（含两轮评审历程索引）
