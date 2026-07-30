@@ -21,6 +21,13 @@
   **匿名实测确认：303 → Location: `/signin`**——必须识别为认证失效，
   不得误报解析错误（DESIGN.md §7.3 风险项）。
 
+## 网络出口
+
+- NetworkProfile 绑定在完整 Cookie Credential；真实验证使用创建 ollama.com 登录会话时的
+  HTTP(S)/SOCKS5(H) 出口。
+- 未绑定时使用普通 socket，由当前系统网络栈/TUN 接管；显式出口失败不得回退。
+- 快照只记录路由模式，不记录 profile、端点、认证或实际 IP。
+
 ## 响应契约（社区来源，待真实账号复核）
 
 - 解析区块：**Cloud Usage**。
@@ -46,4 +53,4 @@
 - [ ] `data-time` 值语义与稳定性（绝对还是滑动）。
 - [ ] 套餐徽章枚举完整性（Free/Pro/Max 之外的新层级 → `unsupported_plan`）。
 - [ ] 绝对用量字段存在性（P-023）。
-- [ ] 系统代理开/关两态下请求行为一致（Windows）。
+- [ ] Windows 上以创建登录会话时的固定出口完成真实读取；显式出口失败不回退。

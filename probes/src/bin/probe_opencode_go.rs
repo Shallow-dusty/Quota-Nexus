@@ -17,7 +17,7 @@ use serde_json::json;
 use std::path::PathBuf;
 
 use aiqm_probes::allowlist::OPENCODE_GO_RULES;
-use aiqm_probes::config::{self, CredentialsFile};
+use aiqm_probes::config::{self, CredentialsFile, NetworkRoute};
 use aiqm_probes::fingerprint;
 use aiqm_probes::http;
 use aiqm_probes::redact::Redactor;
@@ -45,9 +45,14 @@ struct Cli {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let creds = CredentialsFile::load(&cli.credentials).ok();
-    let client = http::build_client()?;
+    let creds = CredentialsFile::load_optional(&cli.credentials)?;
     let redactor = Redactor::new(creds.as_ref().map(|c| c.secrets()).unwrap_or_default());
+    let cred = creds.as_ref().and_then(|c| c.opencode_go.as_ref());
+    let route = match (&creds, cred) {
+        (Some(file), Some(credential)) => file.route_for(credential.network_profile.as_deref())?,
+        _ => NetworkRoute::Default,
+    };
+    let client = http::build_client(&route)?;
     let mut report = ProbeReport::new("opencode-go");
     report
         .notes
@@ -55,8 +60,10 @@ fn main() -> Result<()> {
     report
         .notes
         .push("resetInSec 为相对秒数；resetsAt 由客户端按 now+resetInSec 现算（滑动语义）".into());
+    report
+        .notes
+        .push(format!("network_route={}", route.report_mode()));
 
-    let cred = creds.as_ref().and_then(|c| c.opencode_go.as_ref());
     let cookie = cred
         .map(|c| c.cookie.trim().to_string())
         .filter(|c| !c.is_empty());
@@ -90,7 +97,8 @@ fn main() -> Result<()> {
     match url1_result {
         Err(e) => {
             r1.classification = Classification::NetworkError;
-            r1.evidence.push(redactor.redact(&format!("{e:#}")));
+            r1.evidence
+                .push(http::safe_request_error(&route, &e, &redactor));
         }
         Ok(resp) => {
             r1.status = Some(resp.status);
@@ -162,7 +170,8 @@ fn main() -> Result<()> {
             match http::send_guarded(&client, OPENCODE_GO_RULES, "GET", &url2, &headers) {
                 Err(e) => {
                     r2.classification = Classification::NetworkError;
-                    r2.evidence.push(redactor.redact(&format!("{e:#}")));
+                    r2.evidence
+                        .push(http::safe_request_error(&route, &e, &redactor));
                 }
                 Ok(resp) => {
                     r2.status = Some(resp.status);

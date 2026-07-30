@@ -3,7 +3,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档状态 | Implementation baseline |
-| 设计版本 | 0.4.0 |
+| 设计版本 | 0.5.0 |
 | 最后更新 | 2026-07-30 |
 | 首要平台 | Windows 11 |
 | 产品形态 | 本地桌面应用 |
@@ -34,6 +34,8 @@ OpenCode Go、Ollama Cloud 和 ClinePass 都提供订阅制模型额度，但额
 4. 网络或上游页面失败时保留最后一次成功结果，并明确标记数据是否过期。
 5. 默认使用操作系统安全存储保护凭据，避免秘密因普通配置、日志或导出而意外泄露。
 6. 每个供应商适配器独立演进，单个适配器失败不影响其他供应商。
+7. Provider Credential 可选绑定固定额度采集出口，使网页会话查询延续登录时的网络环境；
+   显式出口失败时不得静默回退。
 
 ### 2.2 首期范围与后续演进
 
@@ -42,11 +44,15 @@ OpenCode Go、Ollama Cloud 和 ClinePass 都提供订阅制模型额度，但额
 
 - 账号选择、切换、轮换和负载均衡。
 - 与 OpenCode、Cline、Ollama 或其他客户端联动。
-- OpenAI-compatible 代理、路由和请求链路观测。
+- 模型请求侧的 OpenAI-compatible 代理、路由和请求链路观测。
 - 使用量分析；如确需处理提示词、回复、项目路径或代码内容，必须由用户明确开启并说明
   保留策略。
 - 经用户授权的浏览器凭据导入、跨设备同步和远程面板。
 - 订阅、账单和其他账号管理能力。
+
+额度采集所需的 Credential 级固定网络出口属于 MVP 网络隔离能力：它只改变只读额度请求的
+传输路径，不接管模型流量，也不提供账号轮换、代理池或负载均衡。模型请求侧代理/路由仍是
+后续方向。
 
 任何扩展都应遵守供应商条款、明确副作用，并与当前额度数据区分来源，不能把估算值冒充为
 上游真实额度。
@@ -78,18 +84,28 @@ OpenCode Go、Ollama Cloud 和 ClinePass 都提供订阅制模型额度，但额
 如果 Ollama 页面结构变化，而 ClinePass 和 OpenCode Go 正常，主界面仍展示后两者；Ollama
 账号显示适配器解析错误和最后成功时间，而不是让整个刷新任务失败。
 
+### 3.5 固定额度采集出口
+
+用户可将创建浏览器 Cookie 会话时使用的固定 HTTP/HTTPS 或 SOCKS5 出口绑定到对应
+Credential。一个 OpenCode Cookie 即使覆盖多个 Workspace，也始终共享同一出口。未绑定时
+使用普通 socket，由当前系统网络栈或 TUN 接管；显式代理不可达、认证失败或配置错误时，
+应用解释为该出口失败，绝不回退到默认/TUN 出口后继续携带该凭据。
+
 ## 4. 演进原则与信任模型
 
 ### 4.1 渐进能力
 
 Phase 0 的额度探针只访问额度查询所需的 GET 或等价只读请求，以便先确认真实接口合同。
-这是一种开发顺序，不是产品永久边界。后续功能可以增加账号操作、客户端写入、代理或推理
-请求，但应：
+这是一种开发顺序，不是产品永久边界。后续功能可以增加账号操作、客户端写入、模型请求
+代理或推理请求，但应：
 
 - 与额度采集适配器分离，避免副作用混入后台刷新。
 - 由用户明确启用，并在执行前说明会修改或发送什么。
 - 为相关 host、path、method 和凭据作用域建立可测试的权限策略。
 - 对可撤销操作提供恢复方式，对不可撤销操作增加确认。
+
+MVP 的额度采集固定出口仍遵守 Phase 0 只读边界：NetworkProfile 绑定在 Credential，
+Provider allowlist 校验最终 HTTPS 目标；代理不扩大 host/path/method 权限，也不代理模型请求。
 
 ### 4.2 本地攻击边界
 
@@ -124,11 +140,11 @@ Manager 或 DPAPI 的保护范围仍然是当前用户边界。
        ┌────────▼────────┐     ┌────────▼──────────────┐
        │ Provider Layer  │     │ Local Infrastructure  │
        │ OpenCode Go     │     │ Credential Manager    │
-       │ Ollama Cloud    │     │ SQLite                │
-       │ ClinePass       │     │ Windows Notifications │
+       │ Ollama Cloud    │     │ Network Profiles      │
+       │ ClinePass       │     │ SQLite · Notifications│
        └────────┬────────┘     └───────────────────────┘
                 │
-       allowlisted HTTPS requests
+       allowlisted HTTPS · credential-bound route
                 │
        ┌────────▼──────────────────────────────┐
        │ opencode.ai · ollama.com · cline.bot │
@@ -156,8 +172,10 @@ Manager 或 DPAPI 的保护范围仍然是当前用户边界。
 - 本地数据库：SQLite。
 - 凭据存储：Windows Credential Manager；必要时使用 CurrentUser 范围的 DPAPI 作为后备。
 - 通知：Windows Toast。
-- HTTP：Rust `reqwest`；首版 Windows 构建优先采用 `native-tls` 以使用系统证书库，
-  禁用自动重定向并由应用逐跳校验目标。
+- HTTP：Rust `reqwest`；首版 Windows 构建使用 `native-tls`（reqwest 0.13 的
+  `default-tls` 已是 rustls）以接入系统证书库。额度 client 禁用自动重定向和
+  系统/环境代理发现；缺省发出普通 socket，由当前系统网络栈/TUN 接管，或按 Credential
+  固定使用单一 HTTP/HTTPS CONNECT、SOCKS5/SOCKS5H 代理。
 - 时间：数据库统一保存 UTC，UI 按本地时区显示。
 - Rust 基线依赖：`sqlx`（SQLite/migrate）、`keyring-core` +
   `windows-native-keyring-store`（WCM）、`secrecy` + `zeroize`、`reqwest`、
@@ -174,9 +192,9 @@ Manager 或 DPAPI 的保护范围仍然是当前用户边界。
 
 ### 6.1 UI 层
 
-UI 只接收脱敏后的 View Model，不直接读取已保存的 API Key 或 Cookie。新秘密只存在于
-添加/更新凭据 Dialog 的局部内存，通过一次性 Tauri command 交给后端；成功、取消、
-关闭或切换为已有凭据时清空。验证失败时可在未关闭的 Dialog 内暂存，以免重复粘贴，
+UI 只接收脱敏后的 View Model，不直接读取已保存的 API Key、Cookie 或代理认证。Provider
+秘密与代理用户名/密码只存在于添加/更新 Dialog 的局部内存，通过一次性 Tauri command
+交给后端；成功、取消、关闭或切换为已有凭据时清空。验证失败时可在未关闭的 Dialog 内暂存，以免重复粘贴，
 但不得进入 Query cache、URL、日志、持久化 store 或诊断信息。
 
 MVP 只保留三个一级页面：
@@ -185,7 +203,9 @@ MVP 只保留三个一级页面：
    - 状态摘要、全部账号额度卡片、筛选/排序和可折叠趋势区。
    - 不计算跨供应商总 token、总余额或其他伪统一指标。
 2. `Accounts`
-   - 添加账号、复用已有凭据、编辑标签、更新凭据、暂停监控和删除本地配置。
+   - 添加账号、复用已有凭据、编辑标签、更新凭据、管理固定出口、暂停监控和删除本地配置。
+   - 新 Credential 可选择默认网络栈或绑定 NetworkProfile；复用 Credential 时沿用其出口，
+     不能按 Account/Workspace 单独覆盖。
    - 账号详情展示下次重试、最近错误类别、连续失败次数和最后验证时间。
 3. `Settings`
    - 刷新周期、托盘、自启动、通知阈值、历史保留和隐私显示。
@@ -232,6 +252,12 @@ Rust Core 输出页面专用 DTO，并用 `availableActions` 告诉 UI 当前是
 ### 6.3 Provider Adapter 接口
 
 ```rust
+pub struct ProviderRequestContext<'a> {
+    pub account: &'a AccountRef,
+    pub secret: &'a SecretMaterial,
+    pub http: &'a ScopedQuotaHttpClient,
+}
+
 #[async_trait]
 pub trait QuotaProvider {
     fn id(&self) -> ProviderId;
@@ -240,33 +266,38 @@ pub trait QuotaProvider {
 
     async fn validate_credentials(
         &self,
-        account: &AccountRef,
-        secret: &SecretMaterial,
+        ctx: &ProviderRequestContext<'_>,
     ) -> Result<CredentialHealth, ProviderError>;
 
     async fn fetch_quota(
         &self,
-        account: &AccountRef,
-        secret: &SecretMaterial,
+        ctx: &ProviderRequestContext<'_>,
     ) -> Result<ProviderSnapshot, ProviderError>;
 }
 ```
 
-适配器返回供应商原生窗口，Normalizer 再转换为统一模型。适配器不得直接写数据库、发通知
-或更新 UI。
+Core 根据 Credential 解析 NetworkProfile，并构造同时绑定 Provider allowlist 与唯一网络出口
+的 `ScopedQuotaHttpClient`；Adapter 不读取代理认证，也不能自行选择 fallback。适配器返回
+供应商原生窗口，Normalizer 再转换为统一模型。适配器不得直接写数据库、发通知或更新 UI。
 
-### 6.4 当前额度模块的 HTTP 与进程策略
+### 6.4 当前额度模块的 HTTP、网络出口与进程策略
 
 - 当前额度 client 不启用 cookie store；每次请求在通过适配器 allowlist 后才从秘密类型中
-  手工注入 Cookie/API Key。未来浏览器登录或代理功能使用独立 client 和权限配置。
+  手工注入 Cookie/API Key。浏览器登录自动化或模型请求代理使用独立 client 和权限配置。
+- `reqwest` 自动系统/环境代理发现始终关闭，路由只有两种：
+  1. Credential 未绑定 NetworkProfile：发出普通 socket，由当前系统网络栈/TUN 接管；
+  2. Credential 绑定 NetworkProfile：所有额度请求固定使用唯一 HTTP/HTTPS CONNECT、
+     SOCKS5 或 SOCKS5H 代理。显式代理配置错误、认证失败或不可达时直接失败，不回退默认路由。
+- SOCKS5 默认在本机解析目标 DNS；需要代理端解析时必须显式选择 SOCKS5H。首期不实现
+  代理池、轮换、负载均衡、失败自动切换、浏览器代理接管或模型流量代理。
+- Provider allowlist 始终校验最终请求的 HTTPS host/path/method；网络路由不能扩大凭据
+  发送范围，也不得为显示出口 IP 擅自增加第三方 IP echo host。
 - 自动重定向设为 `none`。需要跟随时最多 3 跳，每跳重新校验 HTTPS、host、path 和
   origin；只有新目标与该凭据声明的 origin 完全匹配时才重新注入秘密。
-- 当前 HTTP client 默认跟随 Windows 系统代理设置，首期不要求账号级代理；未来可以增加
-  账号级代理或路由，但不能隐式扩大凭据发送范围。
 - 应用使用单实例插件。第二次启动只唤起已有窗口并转发无秘密的启动意图，避免两个进程
   同时调度和写 SQLite。
-- 当前凭据录入 IPC 采用 UI → Rust 单向提交；未来如增加凭据管理界面，也只返回必要的
-  脱敏状态，不回显完整秘密。
+- 当前凭据与代理认证录入 IPC 采用 UI → Rust 单向提交；管理界面只返回必要的脱敏状态和
+  NetworkProfile 非秘密元数据，不回显完整秘密。
 
 ## 7. 供应商适配器
 
@@ -277,6 +308,7 @@ pub trait QuotaProvider {
 - 用户输入 ClinePass API Key。
 - 后端把 API Key 保存到 Windows Credential Manager。
 - 数据库仅保存对应的 credential reference。
+- Credential 默认可走当前 TUN/系统网络栈，也允许用户主动绑定固定出口。
 
 #### 数据源
 
@@ -311,7 +343,9 @@ Header、字段名称、百分比方向以及重置时间格式，不能仅根�
 - Workspace ID。
 - `opencode.ai` 登录 Auth Cookie。
 
-额度查询不要求应用持有 Go 推理 API Key。首版不收集 API Key，以落实最小权限。
+额度查询不要求应用持有 Go 推理 API Key。首版不收集 API Key，以落实最小权限。同一登录
+Cookie 覆盖多个 Workspace 时共享同一 Credential 和 NetworkProfile；真实验证应绑定到创建
+该网页登录会话时使用的出口。
 
 #### 数据源
 
@@ -348,6 +382,7 @@ Phase 0 不通过额外模型请求反推额度，以免探针本身改变被测
 - 使用 `ollama.com` 登录会话 Cookie。
 - 初版为加快接口验证，采用用户手动粘贴完整 `Cookie` header。
 - 后续可以增加经用户授权的浏览器 Cookie 导入，并清楚展示读取范围。
+- 真实 Cookie 的额度查询应绑定到创建该网页登录会话时使用的固定出口。
 
 #### 数据源
 
@@ -397,7 +432,28 @@ interface ProviderAccount {
 }
 ```
 
-### 8.2 Credential
+### 8.2 NetworkProfile
+
+```ts
+type ProxyScheme = "http" | "https" | "socks5" | "socks5h";
+
+interface NetworkProfile {
+  id: string;                 // 本地 UUID
+  label: string;
+  scheme: ProxyScheme;
+  host: string;
+  port: number;
+  proxyCredentialRef?: string; // WCM opaque reference；用户名/密码不进 SQLite
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+NetworkProfile 只描述额度采集固定出口。完整代理 URL、用户名和密码不得进入普通日志、快照
+或 Rust → UI 额度 DTO；UI 配置页只按需读取 scheme/host/port 等非秘密元数据。删除仍被
+Credential 引用的 NetworkProfile 必须失败关闭。
+
+### 8.3 Credential
 
 ```ts
 interface Credential {
@@ -405,16 +461,19 @@ interface Credential {
   providerId: ProviderId;
   label: string;
   credentialRef: string;      // wcm:<target> 或 dpapi:<absolute-path>
+  networkProfileId?: string;  // null/缺省 = 普通 socket，由当前系统网络栈/TUN 接管
   createdAt: string;
   updatedAt: string;
 }
 ```
 
 同一凭据可以关联多个账号。例如同一个 OpenCode 登录 Cookie 可读取多个 Workspace，
-每个 Workspace 仍作为独立 `ProviderAccount` 展示和调度。删除账号不得自动删除仍被其他
-账号引用的凭据；凭据只在引用数为零且用户确认删除时从安全存储移除。
+每个 Workspace 仍作为独立 `ProviderAccount` 展示和调度，但共享该 Credential 的唯一
+NetworkProfile。删除账号不得自动删除仍被其他账号引用的凭据；凭据只在引用数为零且用户
+确认删除时从安全存储移除。NetworkProfile 绑定只能在 Credential 层修改，不能被某个
+Account/Workspace 覆盖。
 
-### 8.3 QuotaWindow
+### 8.4 QuotaWindow
 
 ```ts
 type WindowKind =
@@ -443,7 +502,7 @@ interface QuotaWindow {
 - `observedAt` 优先采用可信的上游观测时间；上游未提供时使用本次 `fetchedAt`。
 - 不同供应商的额度金额或请求数不可直接相加。
 
-### 8.4 Snapshot
+### 8.5 Snapshot
 
 ```ts
 interface QuotaSnapshot {
@@ -460,7 +519,7 @@ interface QuotaSnapshot {
 `now - fetchedAt <= max(2 × 当前有效刷新周期, 30 分钟)` 时为 `fresh`，否则为 `stale`。
 手动模式按 30 分钟界限判断。修改刷新周期会立即改变新鲜度判定，不需要回写历史快照。
 
-### 8.5 Error
+### 8.6 Error
 
 ```ts
 type ProviderErrorKind =
@@ -477,7 +536,8 @@ type ProviderErrorKind =
 
 错误对象可以保存 HTTP 状态、适配器阶段和脱敏摘要，但不得保存：
 
-- Cookie、API Key 或 Authorization header。
+- Cookie、API Key、Authorization header 或代理认证。
+- 完整代理端点、NetworkProfile 标签/ID 或实际出口 IP。
 - 完整 HTML/JSON 响应中的账号身份信息。
 - 请求 header 原文。
 
@@ -486,11 +546,22 @@ type ProviderErrorKind =
 ### 9.1 SQLite 表
 
 ```text
+network_profiles
+  id TEXT PRIMARY KEY
+  label TEXT NOT NULL
+  scheme TEXT NOT NULL CHECK (scheme IN ('http', 'https', 'socks5', 'socks5h'))
+  host TEXT NOT NULL
+  port INTEGER NOT NULL CHECK (port BETWEEN 1 AND 65535)
+  proxy_credential_ref TEXT UNIQUE
+  created_at TEXT NOT NULL
+  updated_at TEXT NOT NULL
+
 credentials
   id TEXT PRIMARY KEY
   provider_id TEXT NOT NULL
   label TEXT NOT NULL
   credential_ref TEXT NOT NULL UNIQUE
+  network_profile_id TEXT REFERENCES network_profiles(id) ON DELETE RESTRICT
   created_at TEXT NOT NULL
   updated_at TEXT NOT NULL
 
@@ -571,6 +642,8 @@ account_health
   双重保证。
 - `alert_deliveries(account_id, window_kind, threshold, state_generation)` 唯一。
 - `quota_snapshots(account_id, fetched_at DESC)` 建索引。
+- `network_profiles` 只保存 label/scheme/host/port 和 opaque proxy credential reference；
+  URL 不允许内嵌认证，Credential 引用存在时删除 NetworkProfile 必须被 `RESTRICT` 拒绝。
 - 外键删除行为必须在 migration 中显式声明。
 - SQLite 每次连接启用 `foreign_keys=ON`、WAL 和 5 秒 `busy_timeout`；schema 只通过
   `sqlx migrate` 演进。
@@ -585,13 +658,14 @@ account_health
 
 清理只涉及监控快照，不删除账号或凭据。
 
-### 9.3 凭据
+### 9.3 Provider 凭据与代理认证
 
-秘密存储分两级：
+Provider 秘密存储分两级，代理认证在 MVP 中固定使用 WCM：
 
 ```text
-wcm:   AIQuotaMonitor/<credential-uuid>
-dpapi: <absolute-path-to-encrypted-secret-file>
+wcm:   AIQuotaMonitor/Credential/<credential-uuid>
+wcm:   AIQuotaMonitor/NetworkProfile/<network-profile-uuid>
+dpapi: <absolute-path-to-encrypted-provider-secret-file>
 ```
 
 首期存储策略：
@@ -600,10 +674,15 @@ dpapi: <absolute-path-to-encrypted-secret-file>
   不超过 2400 bytes 时可保存到 WCM；超过阈值时使用 CurrentUser 范围 DPAPI 加密后写入
   应用数据目录，并采用同目录临时文件 + 原子替换以及仅当前用户可读的 ACL。
 - 业务数据库默认只保存带 `wcm:` / `dpapi:` 前缀的 opaque reference，不保存明文秘密。
-- UI、日志和普通导出不回显完整秘密。
+- 代理用户名和密码序列化后保存到 NetworkProfile 专用 WCM Generic Credential；SQLite 只
+  保存 label、scheme、host、port 和 opaque reference。代理认证不使用 Provider 的 DPAPI
+  文件，也不能与 Provider Cookie/API Key 混存。
+- UI、日志和普通导出不回显 Provider 秘密、代理用户名/密码或完整代理端点。
 - 更新凭据采用覆盖写，旧值不进入历史。
-- 删除最后一个账号引用时，由用户确认是否同时删除安全存储条目。
-- 诊断包默认不包含秘密；未来如提供用户主动选择的加密备份，应作为独立导出类型。
+- 删除最后一个账号引用时，由用户确认是否同时删除 Provider 安全存储条目；删除
+  NetworkProfile 前必须先解除所有 Credential 引用，并确认删除其代理认证条目。
+- 诊断包默认不包含秘密或 NetworkProfile 端点；未来如提供用户主动选择的加密备份，应
+  作为独立导出类型。
 - 首期不采用“SQLite 加密字段 + 同目录 key.bin”的设计。以后若需要跨平台 vault 或
   账号迁移，可以重新评估经过审计的加密存储方案。
 
@@ -725,14 +804,17 @@ Provider 品牌色只用于图标或装饰，不承担健康语义。正常、�
 1. 选择 Provider。
 2. 展示所需字段和最小获取说明。
 3. 选择凭据来源：
-   - 使用已有凭据：只显示同 Provider 的凭据标签、关联账号数和最后验证时间；
+   - 使用已有凭据：只显示同 Provider 的凭据标签、关联账号数、网络出口模式和最后验证时间；
    - 新建凭据：填写凭据标签和秘密。
-4. 填写账号标签及 Workspace 等非秘密作用域。
-5. 验证连接，成功后保存并返回 Overview。
+4. 新建凭据选择网络出口：默认网络栈、已有 NetworkProfile，或新建固定出口；新建出口只
+   显示 scheme/host/port，代理用户名/密码使用一次性秘密输入。
+5. 填写账号标签及 Workspace 等非秘密作用域。
+6. 使用选定出口验证连接，成功后保存并返回 Overview。
 
-复用已有凭据时只提交 `credential_id`，不传输秘密，也不显示 API Key/Cookie 派生尾缀。
-帮助说明在宽窗口使用右侧面板，在窄窗口退为 Dialog 内的可折叠区域。认证、网络和解析
-错误使用不同文案与动作。
+复用已有凭据时只提交 `credential_id`，不传输秘密，也不显示 API Key/Cookie 派生尾缀；
+其 NetworkProfile 随 Credential 复用，若修改必须明确提示会影响所有关联账号。帮助说明在
+宽窗口使用右侧面板，在窄窗口退为 Dialog 内的可折叠区域。认证、固定出口和 Provider
+解析错误使用不同文案与动作。
 
 ### 11.6 组件层级
 
@@ -795,15 +877,21 @@ MVP 同时提供“导出最新快照为 JSON”操作，复用脱敏后的领�
 当前额度模块的默认日志不记录：
 
 - API Key、Cookie 值或 Authorization header。
+- 代理用户名、密码、完整代理端点、NetworkProfile 标签/ID 或实际出口 IP。
 - 完整 Workspace ID。
 - 邮箱、用户名和组织名称。
 - 上游完整响应正文。
 - 未脱敏的用户目录绝对路径。
 
+Release 日志过滤器不得开启 `reqwest` / `hyper` 等依赖的 debug/trace 输出；依赖内部诊断
+可能包含代理 URI，不能依赖事后字面量替换兜底。显式代理底层错误统一转换为固定安全摘要。
+
 默认可以记录：
 
 - 本地账号 UUID 的短前缀。
 - HTTP 状态码。
+- 网络路由模式（`default_tun_or_process_route` / `explicit_fixed_proxy`）和粗粒度失败类别，
+  不记录具体 profile 或端点。
 - allowlist 路径 ID。
 - 响应 schema 指纹。
 - 适配器版本和解析阶段。
@@ -833,6 +921,7 @@ MVP 同时提供“导出最新快照为 JSON”操作，复用脱敏后的领�
 - 告警阈值、状态代次、跨多阈值合并和静默时段投递。
 - 日志脱敏。
 - allowlist 和跨域重定向拒绝。
+- NetworkProfile 协议/URL/认证字段校验、安全 Debug、默认路由与显式代理不回退。
 - 新鲜度派生与自适应刷新迟滞。
 - 账号退避、认证暂停和供应商级 parser 熔断。
 
@@ -868,7 +957,8 @@ Live test 只验证：
 
 ### 14.4 集成测试
 
-- Credential Manager 写入、读取、覆盖和删除。
+- Provider Credential Manager 写入、读取、覆盖和删除。
+- NetworkProfile 代理认证的 WCM 写入/覆盖/删除、Credential 引用约束和秘密扫描。
 - 超长 Cookie 的 DPAPI fallback、ACL、原子替换和引用计数删除。
 - SQLite migration。
 - SQLite 外键、WAL、busy timeout、唯一约束和级联删除。
@@ -876,12 +966,15 @@ Live test 只验证：
 - 休眠/恢复。
 - Windows Toast 去重。
 - 单实例启动及第二次启动时唤起已有窗口。
+- 默认普通 socket/TUN 路由、HTTP/HTTPS CONNECT、SOCKS5/SOCKS5H，以及显式代理不可达、
+  认证失败时不回退；所有路由下 Provider allowlist 保持不变。
 
 ### 14.5 UI 测试
 
 - 0、1、10、50 个账号的布局。
 - 1、2、3 个额度窗口、未知窗口和不同窗口组合。
-- 加载、刷新、陈旧、认证失效、解析失败、暂停和空状态。
+- 加载、刷新、陈旧、认证失效、固定出口失败、解析失败、暂停和空状态。
+- 默认出口、已有 NetworkProfile、新建固定出口及复用 Credential 时不可按 Workspace 覆盖。
 - 长标签、中文标签、`960 × 640` 最小窗口和 100%–200% DPI。
 - 仅键盘完成添加账号、更新凭据、刷新、筛选和打开诊断。
 - 浅色、深色、高对比、减少动态、系统透明开/关和远程桌面 fallback。
@@ -893,16 +986,21 @@ Live test 只验证：
 
 ## 15. 当前额度模块的安全检查清单
 
-进入发布前，对当前实现中适用的项目进行验证；未来新增代理、客户端写入或内容分析能力时，
-应为新增能力补充相应检查，而不是把本清单解释为禁止扩展：
+进入发布前，对当前实现中适用的项目进行验证；未来新增模型请求代理、客户端写入或内容分析
+能力时，应为新增能力补充相应检查，而不是把本清单解释为禁止扩展：
 
 - [ ] 所有上游请求使用 HTTPS。
 - [ ] 每个适配器有独立主机和路径 allowlist。
 - [ ] HTTP client 未启用 cookie jar；Cookie/Authorization 只在请求发送前按凭据作用域注入。
 - [ ] 自动重定向关闭；手动跟随不超过 3 跳，每一跳重新执行 HTTPS、host、path 和 origin
       校验，只有目标 origin 与凭据作用域完全匹配时才可重新注入秘密。
-- [ ] 系统代理不能绕过 allowlist；Phase 0 在 Windows 系统代理开启/关闭两种状态下验证。
-- [ ] 日志和错误对象通过统一 redactor。
+- [ ] `reqwest` 自动系统/环境代理发现关闭；未绑定 NetworkProfile 时只使用普通 socket，
+      由当前系统网络栈/TUN 接管。
+- [ ] 显式 HTTP/HTTPS/SOCKS5/SOCKS5H 代理命中后，配置、连接或认证失败绝不回退默认路由。
+- [ ] 无论路由模式如何，代理都不能绕过最终 HTTPS host/path/method allowlist。
+- [ ] 代理认证只在 Windows Credential Manager；SQLite、快照、普通日志和错误不含代理
+      用户名、密码、完整端点、profile 标识或实际出口 IP。
+- [ ] 日志和错误对象通过统一 redactor；显式代理底层错误使用固定安全摘要。
 - [ ] SQLite 业务表不含明文 Cookie/API Key。
 - [ ] 凭据删除可验证。
 - [ ] 凭据录入 IPC 不回显秘密、`credentialRef` 或可逆片段。
@@ -943,7 +1041,11 @@ Live test 只验证：
   若未包含，也明确记录“当前未观察到”。结果写入 `docs/provider-contracts/`，作为是否
   扩展领域模型的证据；不得为完成记录而调用推理接口或保存未脱敏原始响应。
 - 明确每个请求的 host、path、method。
-- 验证 Windows 系统代理开启/关闭时的请求行为、证书信任和 allowlist 不变量。
+- 验证两类可解释路由：未绑定 NetworkProfile 时由当前系统网络栈/TUN 接管；绑定显式
+  HTTP/HTTPS/SOCKS5/SOCKS5H 时固定走该出口。目标在本地网络中无法裸直连不构成失败。
+- 使用本地不可达代理做无真实凭据负向测试：必须报告网络错误且不回退默认/TUN 出口。
+- 真实 OpenCode/Ollama Cookie 验证使用创建网页登录会话时的出口；证据只记录路由模式，
+  不记录代理端点、认证或实际 IP。
 - 记录每个供应商的重置语义：绝对周期、滑动窗口或未知；未知时不得臆造周期 ID。
 
 退出条件：
@@ -951,6 +1053,7 @@ Live test 只验证：
 - 每个供应商至少一个真实账号成功返回额度。
 - 探针本身没有模型推理请求。
 - 能可靠区分认证失效、网络失败和解析失败。
+- 显式代理失败不回退的负向验证通过，快照/终端秘密扫描不含代理信息。
 
 Phase 0 进行期间可以并行建立与供应商无关的 tokens、三类 surface 和静态状态矩阵，
 但在 Phase 0 退出前不得冻结 `QuotaWindowView` 等 Provider 相关 DTO。
@@ -959,10 +1062,10 @@ Phase 0 进行期间可以并行建立与供应商无关的 tokens、三类 surf
 
 交付：
 
-- Provider trait。
+- Provider trait 与 route-bound `ScopedQuotaHttpClient`。
 - Normalizer。
-- SQLite schema/migration。
-- Credential Manager。
+- SQLite schema/migration（含 NetworkProfile 与 Credential 引用）。
+- Provider/代理认证的 Credential Manager 存储。
 - 调度器和缓存。
 - React/Tauri 基础、设计 tokens、三类 surface 和最少通用控件。
 - 第一个已验证合同最稳定的 Adapter；默认选择 ClinePass。
@@ -985,7 +1088,7 @@ ClinePass 只有在 Phase 0 实证当前 host、path、认证 Header 和响应�
 - Overview、Accounts、Settings 三个一级页面。
 - 账号详情诊断和 Settings Provider 诊断区。
 - 手动和周期刷新。
-- 多账号筛选、风险排序、部分失败和凭据复用。
+- 多账号筛选、风险排序、部分失败、凭据复用和 NetworkProfile 管理。
 - 托盘入口。
 - 截图隐私模式。
 
@@ -1031,6 +1134,8 @@ ClinePass 只有在 Phase 0 实证当前 host、path、认证 Header 和响应�
 - [ ] 展示重置时间和最后成功时间。
 - [ ] 支持账号级暂停和凭据更新。
 - [ ] 添加账号时可复用同 Provider 的已有凭据，不回显秘密或秘密派生片段。
+- [ ] Credential 可选择默认网络栈或绑定固定 NetworkProfile；同一 Credential 覆盖多个
+      Workspace 时共用同一出口。
 - [ ] 支持 Warning/High/Critical 通知。
 - [ ] 支持导出脱敏后的最新快照 JSON。
 - [ ] 支持开机自启开关，默认关闭。
@@ -1044,11 +1149,14 @@ ClinePass 只有在 Phase 0 实证当前 host、path、认证 Header 和响应�
 - [ ] 429 不导致紧密重试。
 - [ ] 应用重启后保留账号配置、历史和告警去重状态。
 - [ ] 第二次启动只唤起已有实例，不产生并行调度器。
-- [ ] 加载、刷新、陈旧、认证失效、解析失败、暂停和空状态均有明确表现。
+- [ ] 显式代理配置错误、不可达或认证失败时请求失败且不回退默认/TUN 出口。
+- [ ] 加载、刷新、陈旧、认证失效、固定出口失败、解析失败、暂停和空状态均有明确表现。
 
 安全：
 
 - [ ] SQLite 业务表、默认日志和普通诊断包中找不到明文秘密。
+- [ ] 代理用户名/密码只进入 WCM；日志、快照、错误和额度 DTO 不含完整代理端点或 profile
+      标识，NetworkProfile 不能绕过 Provider allowlist。
 - [ ] MVP 未启用的客户端写入、外部监听和推理请求不会被后台额度刷新意外触发。
 - [ ] 将来新增有副作用的能力时具备显式开关、权限说明和对应测试。
 
@@ -1076,6 +1184,7 @@ ClinePass 只有在 Phase 0 实证当前 host、path、认证 Header 和响应�
 │     ├─ domain/
 │     ├─ scheduler/
 │     ├─ storage/
+│     ├─ network/
 │     └─ notifications/
 ├─ src/
 │  ├─ pages/
@@ -1097,13 +1206,16 @@ ClinePass 只有在 Phase 0 实证当前 host、path、认证 Header 和响应�
    经用户授权的浏览器导入。
 6. MVP 包含脱敏后的最新快照 JSON 导出。
 7. 支持系统启动时自动运行，默认关闭。
-8. 账号切换、客户端联动、代理/路由和使用分析不属于首期验收项，但保留为正式演进方向。
-9. Liquid Glass 只作为 Windows UI 风格；数据面保持稳定，玻璃集中在控制层和浮层。
-10. MVP 只有 Overview、Accounts、Settings 三个一级页面；诊断、趋势和简单告警内嵌。
-11. 不展示跨供应商总额度；账号卡使用多窗口线性信息，圆环移出 MVP。
-12. React Aria 是唯一行为原语；shadcn 只使用 `aria` base 生成源码脚手架。
-13. Rust 调度器是唯一刷新时钟，TanStack Query 只缓存 Core DTO。
-14. 首个纵向切片默认选 Phase 0 验证通过的 ClinePass，再扩展其余 Provider。
+8. 额度采集固定出口进入 MVP：NetworkProfile 绑定 Credential；缺省走普通 socket/TUN，
+   显式代理失败不回退，也不增加第三方 IP echo 请求。
+9. 模型请求侧的账号切换、客户端联动、代理/路由和使用分析不属于首期验收项，但保留为
+   正式演进方向；不能与第 8 项额度采集网络隔离混为一谈。
+10. Liquid Glass 只作为 Windows UI 风格；数据面保持稳定，玻璃集中在控制层和浮层。
+11. MVP 只有 Overview、Accounts、Settings 三个一级页面；诊断、趋势和简单告警内嵌。
+12. 不展示跨供应商总额度；账号卡使用多窗口线性信息，圆环移出 MVP。
+13. React Aria 是唯一行为原语；shadcn 只使用 `aria` base 生成源码脚手架。
+14. Rust 调度器是唯一刷新时钟，TanStack Query 只缓存 Core DTO。
+15. 首个纵向切片默认选 Phase 0 验证通过的 ClinePass，再扩展其余 Provider。
 
 ## 21. 参考实现与外部依据
 

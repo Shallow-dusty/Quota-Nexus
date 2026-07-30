@@ -29,6 +29,14 @@
 - 响应格式：SolidStart devalue JS 序列化（`text/javascript`），
   响应 key 由请求方 `X-Server-Instance` UUID 决定（匿名实测确认）。
 
+## 网络出口
+
+- NetworkProfile 绑定在 OpenCode Cookie Credential，不绑定 Workspace；一个 Cookie 枚举出的
+  多个 Workspace 必须共享同一出口。
+- 真实 Cookie 验证应固定使用创建该 opencode.ai 登录会话时的 HTTP(S)/SOCKS5(H) 出口。
+- 未绑定时使用普通 socket，由当前系统网络栈/TUN 接管；显式出口失败不得回退。
+- 快照只记录路由模式，不记录 profile、端点、认证或实际 IP。
+
 ## 响应契约（社区来源，待真实账号复核）
 
 - 窗口字段：`rollingUsage` / `weeklyUsage` / `monthlyUsage` 各自包含
@@ -55,4 +63,5 @@
 - [ ] `usagePercent` 原值量级（0-1 / 0-100）与方向。
 - [ ] `resetInSec` 相邻轮询漂移形态（验证滑动推断）。
 - [ ] 绝对用量字段存在性（P-023）。
-- [ ] 页面重定向行为与 allowlist 不变量；系统代理开/关两态（Windows）。
+- [ ] 页面重定向行为与 allowlist 不变量。
+- [ ] Windows 上以创建登录会话时的固定出口完成真实读取；显式出口失败不回退。

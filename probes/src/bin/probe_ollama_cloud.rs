@@ -14,7 +14,7 @@ use serde_json::json;
 use std::path::PathBuf;
 
 use aiqm_probes::allowlist::OLLAMA_CLOUD_RULES;
-use aiqm_probes::config::{self, CredentialsFile};
+use aiqm_probes::config::{self, CredentialsFile, NetworkRoute};
 use aiqm_probes::fingerprint;
 use aiqm_probes::http;
 use aiqm_probes::redact::Redactor;
@@ -40,9 +40,14 @@ struct Cli {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let creds = CredentialsFile::load(&cli.credentials).ok();
-    let client = http::build_client()?;
+    let creds = CredentialsFile::load_optional(&cli.credentials)?;
     let redactor = Redactor::new(creds.as_ref().map(|c| c.secrets()).unwrap_or_default());
+    let credential = creds.as_ref().and_then(|c| c.ollama_cloud.as_ref());
+    let route = match (&creds, credential) {
+        (Some(file), Some(credential)) => file.route_for(credential.network_profile.as_deref())?,
+        _ => NetworkRoute::Default,
+    };
+    let client = http::build_client(&route)?;
     let mut report = ProbeReport::new("ollama-cloud");
     report
         .notes
@@ -50,10 +55,11 @@ fn main() -> Result<()> {
     report
         .notes
         .push("不依赖单一 cookie 名：完整发送用户提供的 Cookie header".into());
+    report
+        .notes
+        .push(format!("network_route={}", route.report_mode()));
 
-    let cookie = creds
-        .as_ref()
-        .and_then(|c| c.ollama_cloud.as_ref())
+    let cookie = credential
         .map(|c| c.cookie.trim().to_string())
         .filter(|c| !c.is_empty());
 
@@ -86,7 +92,8 @@ fn main() -> Result<()> {
     match http::send_guarded(&client, OLLAMA_CLOUD_RULES, "GET", URL, &headers) {
         Err(e) => {
             rr.classification = Classification::NetworkError;
-            rr.evidence.push(redactor.redact(&format!("{e:#}")));
+            rr.evidence
+                .push(http::safe_request_error(&route, &e, &redactor));
         }
         Ok(resp) => {
             rr.status = Some(resp.status);

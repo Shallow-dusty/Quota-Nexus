@@ -19,6 +19,15 @@
 - 失效信号：HTTP 401/403。匿名实测 401 响应体为 JSON：
   `{"error": "Unauthorized: ..."}`（端点存在且鉴权生效，已验证）。
 
+## 网络出口
+
+- Credential 未绑定 NetworkProfile 时禁用 reqwest 自动系统/环境代理，使用普通 socket，
+  由当前系统网络栈/TUN 接管。
+- ClinePass API Key 可按用户实际 API 使用环境绑定固定 HTTP(S)/SOCKS5(H) 出口。
+- 本机不可达显式代理负向实测：分类为 `network_error` 且未回退；若发生回退，本次假 Key
+  会直达 Provider 并返回 401，而实测未发生。快照只记录 `explicit_fixed_proxy`，不含
+  profile、端点、认证或实际 IP。
+
 ## 响应契约（社区来源，待真实账号复核）
 
 - 顶层结构：`{ "success": bool, "data": { "limits": [...] } }`。
@@ -36,6 +45,7 @@
 ## 证据
 
 - 快照：`snapshots/clinepass-20260730T043519Z.json`（匿名 401）
+- 快照：`snapshots/clinepass-20260730T053328Z.json`（不可达显式代理；不回退负向证据）
 - 原始响应（gitignored）：`data/probe-raw/clinepass/`
 
 ## 待验证清单
@@ -44,4 +54,5 @@
 - [ ] 三个窗口是否同时存在；`percentUsed` 数值方向与范围（0-100 / 0-1）。
 - [ ] `resetsAt` 是否恒非空；相邻轮询间是否漂移（绝对还是滑动现算）。
 - [ ] 绝对用量字段存在性（P-023）。
-- [ ] 系统代理开/关两态下请求行为一致（Windows）。
+- [x] 不可达显式代理不回退默认/TUN 出口（无真实凭据负向验证）。
+- [ ] Windows 默认 TUN 与账号固定出口下分别完成真实读取；证据只记录路由模式。

@@ -1,0 +1,31 @@
+{
+  "provider": "clinepass",
+  "probe_version": "0.1.0",
+  "started_at_utc": "2026-07-30T05:33:28.82105898Z",
+  "proxy_env_detected": [],
+  "requests": [
+    {
+      "seq": 1,
+      "purpose": "usage-limits",
+      "method": "GET",
+      "host": "api.cline.bot",
+      "path": "/api/v1/users/me/plan/usage-limits",
+      "query": "none",
+      "authenticated": true,
+      "status": null,
+      "content_type": null,
+      "redirect_location": null,
+      "classification": "network_error",
+      "evidence": [
+        "发送请求失败（显式固定代理连接/认证/TLS 或上游网络错误；未回退默认路由）"
+      ],
+      "fingerprint": null,
+      "extracted": {}
+    }
+  ],
+  "verdict": "network_or_unexpected",
+  "notes": [
+    "契约起点: CodexBar ClinePassUsageFetcher.swift (MIT)",
+    "network_route=explicit_fixed_proxy"
+  ]
+}

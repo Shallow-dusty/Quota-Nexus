@@ -17,10 +17,12 @@ provider-contracts/
 ## 脱敏规则（DESIGN.md §13.2 / §14.2）
 
 允许出现在契约与快照中：HTTP 状态码、allowlist 路径、响应结构指纹（key 树 + 类型）、
-百分比数值、重置时间语义、窗口类型枚举、套餐枚举（Free/Pro/Max）。
+百分比数值、重置时间语义、窗口类型枚举、套餐枚举（Free/Pro/Max），以及粗粒度路由模式
+（`default_tun_or_process_route` / `explicit_fixed_proxy`）。
 
 禁止出现：Cookie / API Key / Authorization 值、完整 workspace ID（`wrk_` 全值）、
-邮箱 / 用户名 / 组织名、订阅标识、上游完整响应原文。
+邮箱 / 用户名 / 组织名、订阅标识、上游完整响应原文，以及 NetworkProfile 标签/ID、代理
+scheme/host/port/完整 URL、代理用户名/密码和实际出口 IP。
 
 原始响应只存在于 `data/probe-raw/`（gitignored），整理 fixture 时必须另行脱敏。
 
