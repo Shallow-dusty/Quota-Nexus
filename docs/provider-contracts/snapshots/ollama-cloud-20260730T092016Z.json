@@ -1,0 +1,74 @@
+{
+  "provider": "ollama-cloud",
+  "probe_version": "0.1.0",
+  "started_at_utc": "2026-07-30T09:20:14.952786681Z",
+  "proxy_env_detected": [],
+  "requests": [
+    {
+      "seq": 1,
+      "purpose": "settings-page",
+      "method": "GET",
+      "host": "ollama.com",
+      "path": "/settings",
+      "query": "none",
+      "authenticated": true,
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "redirect_location": null,
+      "classification": "success",
+      "evidence": [
+        "原始响应(未脱敏): /mnt/e/coding/06.AI-Quota-Monitor/data/probe-raw/ollama-cloud/20260730T092016Z-seq1.txt",
+        "Cloud Usage 标记=false，session%=Some(0.6)，weekly%=Some(48.3)，data-time 2 处"
+      ],
+      "fingerprint": {
+        "data_time_elements": [
+          {
+            "data-time": "2026-07-30T14:00:00Z",
+            "tag": "div",
+            "text": "Resets in 5 hours."
+          },
+          {
+            "data-time": "2026-08-03T00:00:00Z",
+            "tag": "div",
+            "text": "Resets in 3 days."
+          }
+        ],
+        "has_cloud_usage_marker": false,
+        "percent_elements": [
+          {
+            "tag": "div",
+            "text": "Session usage\n      \n        0.6% used"
+          },
+          {
+            "tag": "div",
+            "text": "Weekly usage\n      48.3% used"
+          }
+        ],
+        "plan_tokens_found": [
+          "Pro"
+        ],
+        "title": "Usage · Settings"
+      },
+      "extracted": {
+        "data_time_values": [
+          "2026-07-30T14:00:00Z",
+          "2026-08-03T00:00:00Z"
+        ],
+        "has_cloud_usage_marker": false,
+        "plan_tokens_found": [
+          "Pro"
+        ],
+        "reset_semantics": "data-time 属性（ISO 时间戳，绝对语义，待复核）",
+        "session_percent_raw": 0.6,
+        "signin_body_markers": [],
+        "weekly_percent_raw": 48.3
+      }
+    }
+  ],
+  "verdict": "success",
+  "notes": [
+    "契约起点: CodexBar docs/ollama.md / OllamaUsageParser (MIT)",
+    "不依赖单一 cookie 名：完整发送用户提供的 Cookie header",
+    "network_route=default_tun_or_process_route"
+  ]
+}

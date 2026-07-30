@@ -61,6 +61,18 @@
 - 本地探针暂把代理认证放在 gitignored 的 `credentials.local.json`；正式应用会把代理
   用户名/密码放入 Windows Credential Manager，SQLite 只保存非秘密路由元数据。
 
+### 从 Firefox 请求头快速导入
+
+在 Firefox DevTools 的 Network 请求上复制请求头 JSON 后，运行：
+
+```powershell
+.\probes\import-request-headers.ps1 -Provider ollama_cloud
+.\probes\import-request-headers.ps1 -Provider opencode_go -NetworkProfile opencode-login-ip
+```
+
+脚本只接受匹配 Provider 域名的请求头，提取 Cookie 后原子更新 gitignored 的
+`credentials.local.json`，不回显 Cookie，并保留其他 Provider 与代理配置。
+
 ## 运行
 
 ```bash
