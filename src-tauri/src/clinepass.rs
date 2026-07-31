@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use reqwest::{redirect::Policy, StatusCode};
+use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use zeroize::Zeroizing;
 
@@ -28,15 +26,7 @@ struct UsageLimit {
     resets_at: Option<String>,
 }
 
-pub async fn fetch(api_key: &str) -> Result<Vec<QuotaWindowView>, CommandError> {
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .redirect(Policy::none())
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(20))
-        .build()
-        .map_err(|_| CommandError::network("无法初始化 Cline Pass 网络客户端"))?;
-
+pub async fn fetch(client: &Client, api_key: &str) -> Result<Vec<QuotaWindowView>, CommandError> {
     let authorization = Zeroizing::new(format!("Bearer {api_key}"));
     let response = client
         .get(USAGE_URL)
@@ -141,5 +131,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(normalize(payload).unwrap_err().code, "parser");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires AIQM_CLINEPASS_API_KEY and real network access"]
+    async fn live_contract_uses_desktop_adapter() {
+        let secret = std::env::var("AIQM_CLINEPASS_API_KEY").expect("missing live credential");
+        let client = crate::network::build_default_client().unwrap();
+        let windows = fetch(&client, &secret).await.unwrap();
+        assert!(!windows.is_empty());
     }
 }

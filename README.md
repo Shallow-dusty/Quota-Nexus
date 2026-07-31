@@ -36,13 +36,14 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 
 当前状态：Phase 0 已完成。三个只读探针均已通过真实账号验证，匿名鉴权行为、显式代理
 失败不回退、默认 TUN 路由和脱敏证据均已验证（见 `docs/provider-contracts/`）。
-Phase 1 的前端静态矩阵和第一条 ClinePass 纵向链路已经落地：React 可在普通浏览器用
-Phase 0 脱敏样本独立预览；Tauri 桌面运行时则使用 Rust Core、SQLite migration 和
-Windows Credential Manager，支持添加 ClinePass 账号、真实连接验证、额度 DTO、账号列表
-及全局/单账号手动刷新。`pnpm desktop:build` 已生成并启动验证 Windows EXE；Rust 自动测试
-覆盖 ClinePass 合同、SQLite 配置/读写和 WCM 临时凭据写入/读取/删除。尚待用户在桌面端
-录入一个真实 ClinePass API Key，完成 UI 端到端验收；随后接入 NetworkProfile 固定出口、
-OpenCode Go 与 Ollama Cloud。
+Phase 1 的三供应商纵向链路已经落地：React 可在普通浏览器用 Phase 0 脱敏样本独立预览；
+Tauri 桌面运行时使用 Rust Core、SQLite migration 和 Windows Credential Manager，统一
+支持 ClinePass、OpenCode Go、Ollama Cloud 的凭据验证、添加账号、账号列表以及全局/单账号
+手动刷新。OpenCode Go 可自动发现全部 Workspace，并以一份凭据建立多个账号。每份新凭据
+可使用默认 TUN/系统路由、复用已有固定出口或新建 HTTP(S)/SOCKS5(H) 固定代理；代理认证
+保存在 WCM，显式出口失败不回退。三家正式桌面适配器已通过真实账号验证，SQLite、WCM 和
+前端构建/视觉矩阵也已通过自动验证。下一阶段是桌面 UI 人工录入验收、定时调度、告警和
+凭据复用界面。
 
 常用命令：
 

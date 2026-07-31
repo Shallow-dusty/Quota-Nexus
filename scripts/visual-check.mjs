@@ -85,6 +85,8 @@ for (const shot of shots) {
     await page.getByRole("button", { name: /OpenCode Go/ }).click();
     await page.getByRole("button", { name: "下一步" }).click();
     await page.getByText("凭据来源").waitFor();
+    await page.getByText("新建固定代理", { exact: true }).click();
+    await page.getByPlaceholder("socks5h://host:port").waitFor();
   }
 
   const visibleText = (await page.locator("body").innerText()).trim();

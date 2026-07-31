@@ -18,7 +18,7 @@ impl CommandError {
     pub fn auth() -> Self {
         Self {
             code: "auth",
-            message: "Cline Pass 凭据无效或已失效".into(),
+            message: "供应商凭据无效或已失效".into(),
         }
     }
 
@@ -32,6 +32,13 @@ impl CommandError {
     pub fn parser(message: impl Into<String>) -> Self {
         Self {
             code: "parser",
+            message: message.into(),
+        }
+    }
+
+    pub fn proxy(message: impl Into<String>) -> Self {
+        Self {
+            code: "proxy",
             message: message.into(),
         }
     }

@@ -3,6 +3,9 @@ mod commands;
 mod credential;
 mod domain;
 mod error;
+mod network;
+mod ollama;
+mod opencode;
 mod storage;
 
 use tauri::Manager;
@@ -21,8 +24,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_overview,
             commands::get_connections,
-            commands::validate_clinepass,
-            commands::create_clinepass_account,
+            commands::get_network_profiles,
+            commands::validate_provider,
+            commands::create_provider_account,
             commands::refresh_all,
             commands::refresh_account,
         ])

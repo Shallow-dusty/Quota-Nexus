@@ -54,17 +54,56 @@ pub struct AccountConnectionView {
     pub error_category: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidateClinePassInput {
-    pub api_key: String,
+pub struct NetworkProfileView {
+    pub id: String,
+    pub label: String,
+    pub endpoint_label: String,
+    pub has_auth: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderValidationView {
+    pub windows: Vec<QuotaWindowView>,
+    pub discovered_account_count: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateClinePassAccountInput {
+pub struct RouteSelectionInput {
+    pub mode: String,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub proxy_url: Option<String>,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidateProviderInput {
+    pub provider: String,
+    pub secret: String,
+    #[serde(default)]
+    pub workspace_id: Option<String>,
+    pub route: RouteSelectionInput,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateProviderAccountInput {
+    pub provider: String,
     pub account_label: String,
     pub credential_label: String,
-    pub api_key: String,
-    pub route_mode: String,
+    pub secret: String,
+    #[serde(default)]
+    pub workspace_id: Option<String>,
+    pub route: RouteSelectionInput,
 }

@@ -1,12 +1,12 @@
 import { ArrowLeft, ArrowRight, Check, Globe, KeyRound } from "lucide-react";
-import { Button, Dialog, DialogTrigger, Modal, ModalOverlay } from "react-aria-components";
-import { useState } from "react";
+import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { useEffect, useState } from "react";
 import {
   commandErrorMessage,
-  isTauriRuntime,
   quotaClient,
+  type RouteSelectionInput,
 } from "../../lib/quota-client";
-import type { AccountConnectionView } from "../../lib/quota-types";
+import type { AccountConnectionView, NetworkProfileView } from "../../lib/quota-types";
 import type { ProviderKind } from "../../lib/quota-types";
 import { FloatingGlass } from "../ui/surface";
 import { ProviderMark } from "./provider-mark";
@@ -34,8 +34,15 @@ export function AddAccountDialog({
   const [scope, setScope] = useState("");
   const [credentialLabel, setCredentialLabel] = useState("");
   const [secret, setSecret] = useState("");
+  const [networkProfiles, setNetworkProfiles] = useState<NetworkProfileView[]>([]);
+  const [existingProfileId, setExistingProfileId] = useState("");
+  const [proxyLabel, setProxyLabel] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
+  const [proxyUsername, setProxyUsername] = useState("");
+  const [proxyPassword, setProxyPassword] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [discoveredAccountCount, setDiscoveredAccountCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,8 +55,14 @@ export function AddAccountDialog({
     setScope("");
     setCredentialLabel("");
     setSecret("");
+    setExistingProfileId("");
+    setProxyLabel("");
+    setProxyUrl("");
+    setProxyUsername("");
+    setProxyPassword("");
     setVerifying(false);
     setVerified(false);
+    setDiscoveredAccountCount(0);
     setSaving(false);
     setError(null);
   }
@@ -57,6 +70,46 @@ export function AddAccountDialog({
   function close() {
     reset();
     onClose();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    quotaClient
+      .getNetworkProfiles()
+      .then((profiles) => {
+        if (!active) return;
+        setNetworkProfiles(profiles);
+        setExistingProfileId((current) => current || profiles[0]?.id || "");
+      })
+      .catch((reason) => {
+        if (active) setError(commandErrorMessage(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  function selectedRoute(): RouteSelectionInput {
+    if (route === "existing") {
+      return { mode: "existing", profileId: existingProfileId };
+    }
+    if (route === "new") {
+      return {
+        mode: "new",
+        label: proxyLabel,
+        proxyUrl,
+        username: proxyUsername.trim() || undefined,
+        password: proxyPassword || undefined,
+      };
+    }
+    return { mode: "default" };
+  }
+
+  function invalidateValidation() {
+    setVerified(false);
+    setDiscoveredAccountCount(0);
+    setError(null);
   }
 
   const steps = ["供应商", "凭据与出口", "账号与验证"];
@@ -108,10 +161,8 @@ export function AddAccountDialog({
                         type="button"
                         onClick={() => {
                           setProvider(p.id);
-                          setVerified(false);
-                          setError(null);
+                          invalidateValidation();
                         }}
-                        disabled={isTauriRuntime && p.id !== "clinepass"}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-md)] text-left transition-colors"
                         style={{
                           border: "1px solid var(--line)",
@@ -119,8 +170,6 @@ export function AddAccountDialog({
                             provider === p.id ? "var(--accent-soft)" : "transparent",
                           borderColor:
                             provider === p.id ? "var(--accent)" : "var(--line)",
-                          opacity:
-                            isTauriRuntime && p.id !== "clinepass" ? 0.52 : 1,
                         }}
                       >
                         <ProviderMark provider={p.id} />
@@ -128,9 +177,6 @@ export function AddAccountDialog({
                           <div className="text-[13px] font-medium text-ink-1">{p.name}</div>
                           <div className="text-[11.5px] text-ink-3">
                             {p.hint}
-                            {isTauriRuntime && p.id !== "clinepass"
-                              ? " · 下一切片接入"
-                              : ""}
                           </div>
                         </div>
                         {provider === p.id && (
@@ -159,11 +205,17 @@ export function AddAccountDialog({
                       {credentialSource === "new" && (
                         <div className="flex flex-col gap-2 mt-2">
                           <TextInput
-                            placeholder="凭据标签，如 Cline Pass · 主 Key"
+                            placeholder={`凭据标签，如 ${
+                              provider === "clinepass"
+                                ? "Cline Pass · 主 Key"
+                                : provider === "opencode-go"
+                                  ? "OpenCode · 主账号"
+                                  : "Ollama · 主账号"
+                            }`}
                             value={credentialLabel}
                             onChange={(event) => {
                               setCredentialLabel(event.target.value);
-                              setVerified(false);
+                              invalidateValidation();
                             }}
                           />
                           <TextAreaInput
@@ -175,8 +227,7 @@ export function AddAccountDialog({
                             value={secret}
                             onChange={(event) => {
                               setSecret(event.target.value);
-                              setVerified(false);
-                              setError(null);
+                              invalidateValidation();
                             }}
                           />
                           <p className="text-[11px] text-ink-3 flex items-center gap-1">
@@ -192,27 +243,73 @@ export function AddAccountDialog({
                         value={route}
                         onChange={(next) => {
                           setRoute(next);
-                          setVerified(false);
+                          invalidateValidation();
                         }}
                         options={[
                           { id: "default", label: "默认网络栈（当前 TUN/系统）" },
                           {
                             id: "existing",
-                            label: "已有固定出口（下一切片）",
-                            disabled: true,
+                            label: "使用已有固定出口",
+                            disabled: networkProfiles.length === 0,
                           },
                           {
                             id: "new",
-                            label: "新建固定代理（下一切片）",
-                            disabled: true,
+                            label: "新建固定代理",
                           },
                         ]}
                       />
+                      {route === "existing" && (
+                        <select
+                          value={existingProfileId}
+                          onChange={(event) => {
+                            setExistingProfileId(event.target.value);
+                            invalidateValidation();
+                          }}
+                          className="mt-2 px-2.5 h-8 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[var(--surface-raised)] border border-[var(--line)] outline-none focus:border-[var(--accent)]"
+                        >
+                          {networkProfiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                              {profile.label} · {profile.endpointLabel}
+                              {profile.hasAuth ? " · 已认证" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {route === "new" && (
-                        <div className="flex gap-2 mt-2">
-                          <TextInput placeholder="socks5h://host:port" className="flex-1" />
-                          <TextInput placeholder="用户名" className="w-24" />
-                          <TextInput placeholder="密码" className="w-20" />
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <TextInput
+                            placeholder="出口标签，如 OpenCode · 日本"
+                            value={proxyLabel}
+                            onChange={(event) => {
+                              setProxyLabel(event.target.value);
+                              invalidateValidation();
+                            }}
+                          />
+                          <TextInput
+                            placeholder="socks5h://host:port"
+                            value={proxyUrl}
+                            onChange={(event) => {
+                              setProxyUrl(event.target.value);
+                              invalidateValidation();
+                            }}
+                          />
+                          <TextInput
+                            placeholder="用户名（可选）"
+                            value={proxyUsername}
+                            onChange={(event) => {
+                              setProxyUsername(event.target.value);
+                              invalidateValidation();
+                            }}
+                          />
+                          <TextInput
+                            type="password"
+                            placeholder="密码（可选）"
+                            value={proxyPassword}
+                            onChange={(event) => {
+                              setProxyPassword(event.target.value);
+                              invalidateValidation();
+                            }}
+                          />
                         </div>
                       )}
                       {provider && provider !== "clinepass" && (
@@ -231,15 +328,21 @@ export function AddAccountDialog({
                       <TextInput
                         placeholder="如 工作区 B"
                         value={label}
-                        onChange={(e) => setLabel(e.target.value)}
+                        onChange={(e) => {
+                          setLabel(e.target.value);
+                          setVerified(false);
+                        }}
                       />
                     </Field>
                     {provider === "opencode-go" && (
                       <Field label="Workspace ID（可选）">
                         <TextInput
-                          placeholder="wrk_… 留空则自动发现第一个"
+                          placeholder="wrk_… 留空则自动发现全部工作区"
                           value={scope}
-                          onChange={(e) => setScope(e.target.value)}
+                          onChange={(e) => {
+                            setScope(e.target.value);
+                            invalidateValidation();
+                          }}
                         />
                       </Field>
                     )}
@@ -250,7 +353,14 @@ export function AddAccountDialog({
                           setVerifying(true);
                           setError(null);
                           try {
-                            await quotaClient.validateClinePass({ apiKey: secret });
+                            if (!provider) return;
+                            const result = await quotaClient.validateProvider({
+                              provider,
+                              secret,
+                              workspaceId: scope.trim() || undefined,
+                              route: selectedRoute(),
+                            });
+                            setDiscoveredAccountCount(result.discoveredAccountCount);
                             setVerified(true);
                           } catch (reason) {
                             setVerified(false);
@@ -262,9 +372,8 @@ export function AddAccountDialog({
                         isDisabled={
                           verifying ||
                           verified ||
-                          provider !== "clinepass" ||
+                          !provider ||
                           credentialSource !== "new" ||
-                          route !== "default" ||
                           !secret.trim()
                         }
                       >
@@ -276,7 +385,9 @@ export function AddAccountDialog({
                       </Button>
                       <p className="text-[11px] text-ink-3 mt-2">
                         {verified
-                          ? "凭据可用，可保存账号"
+                          ? provider === "opencode-go" && discoveredAccountCount > 1
+                            ? `凭据可用，发现 ${discoveredAccountCount} 个 Workspace，将分别建账`
+                            : "凭据可用，可保存账号"
                           : "验证只读额度接口，不消耗模型额度"}
                       </p>
                       {error && (
@@ -305,9 +416,11 @@ export function AddAccountDialog({
                     (step === 0 && !provider) ||
                     (step === 1 &&
                       (credentialSource !== "new" ||
-                        route !== "default" ||
                         !credentialLabel.trim() ||
-                        !secret.trim())) ||
+                        !secret.trim() ||
+                        (route === "existing" && !existingProfileId) ||
+                        (route === "new" &&
+                          (!proxyLabel.trim() || !proxyUrl.trim())))) ||
                     (step === 2 && (!verified || !label.trim()))
                   }
                   onPress={async () => {
@@ -318,12 +431,15 @@ export function AddAccountDialog({
                     setSaving(true);
                     setError(null);
                     try {
+                      if (!provider) return;
                       const connections =
-                        await quotaClient.createClinePassAccount({
+                        await quotaClient.createProviderAccount({
+                          provider,
                           accountLabel: label,
                           credentialLabel,
-                          apiKey: secret,
-                          routeMode: "default",
+                          secret,
+                          workspaceId: scope.trim() || undefined,
+                          route: selectedRoute(),
                         });
                       setSecret("");
                       onSaved?.(connections);

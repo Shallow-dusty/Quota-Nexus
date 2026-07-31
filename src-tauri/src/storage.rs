@@ -8,8 +8,11 @@ use sqlx::{
 };
 
 use crate::{
-    domain::{AccountConnectionView, OverviewView, QuotaWindowView, ServiceQuotaView},
+    domain::{
+        AccountConnectionView, NetworkProfileView, OverviewView, QuotaWindowView, ServiceQuotaView,
+    },
     error::CommandError,
+    network::NewNetworkProfile,
 };
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
@@ -25,6 +28,7 @@ struct AccountRow {
     enabled: bool,
     last_success_at: Option<String>,
     last_error_category: Option<String>,
+    network_profile_label: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
@@ -33,6 +37,51 @@ struct WindowRow {
     window_label: String,
     used_percent: f64,
     resets_at: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct NetworkProfileRecord {
+    pub id: String,
+    pub label: String,
+    pub transport: String,
+    pub host: String,
+    pub port: i64,
+    pub has_auth: bool,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct RefreshTarget {
+    pub id: String,
+    pub provider: String,
+    pub credential_id: String,
+    pub scope_id: Option<String>,
+    pub network_profile_id: Option<String>,
+    pub transport: Option<String>,
+    pub host: Option<String>,
+    pub port: Option<i64>,
+    pub has_auth: Option<bool>,
+}
+
+impl RefreshTarget {
+    pub fn network_profile(&self) -> Option<NetworkProfileRecord> {
+        Some(NetworkProfileRecord {
+            id: self.network_profile_id.clone()?,
+            label: String::new(),
+            transport: self.transport.clone()?,
+            host: self.host.clone()?,
+            port: self.port?,
+            has_auth: self.has_auth.unwrap_or(false),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NewAccountRecord {
+    pub id: String,
+    pub label: String,
+    pub scope_id: Option<String>,
+    pub plan: Option<String>,
+    pub windows: Vec<QuotaWindowView>,
 }
 
 pub async fn open(path: &Path) -> Result<SqlitePool, Box<dyn std::error::Error>> {
@@ -50,13 +99,15 @@ pub async fn open(path: &Path) -> Result<SqlitePool, Box<dyn std::error::Error>>
     Ok(pool)
 }
 
-pub async fn insert_clinepass_account(
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_provider_bundle(
     pool: &SqlitePool,
-    account_id: &str,
-    account_label: &str,
+    provider: &str,
     credential_id: &str,
     credential_label: &str,
-    windows: &[QuotaWindowView],
+    network_profile_id: Option<&str>,
+    new_profile: Option<&NewNetworkProfile>,
+    accounts: &[NewAccountRecord],
 ) -> Result<(), CommandError> {
     let now = Utc::now().to_rfc3339();
     let mut tx = pool
@@ -64,34 +115,60 @@ pub async fn insert_clinepass_account(
         .await
         .map_err(|_| CommandError::storage("无法开始本地数据库事务"))?;
 
+    if let Some(profile) = new_profile {
+        sqlx::query(
+            "INSERT INTO network_profiles
+             (id, label, transport, host, port, has_auth, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&profile.id)
+        .bind(&profile.label)
+        .bind(&profile.transport)
+        .bind(&profile.host)
+        .bind(i64::from(profile.port))
+        .bind(profile.has_auth)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| CommandError::storage("无法保存固定出口"))?;
+    }
+
     sqlx::query(
         "INSERT INTO credentials
          (id, provider, label, network_profile_id, created_at, last_validated_at)
-         VALUES (?, 'clinepass', ?, NULL, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(credential_id)
+    .bind(provider)
     .bind(credential_label)
+    .bind(network_profile_id)
     .bind(&now)
     .bind(&now)
     .execute(&mut *tx)
     .await
     .map_err(|_| CommandError::storage("无法保存凭据元数据"))?;
 
-    sqlx::query(
-        "INSERT INTO provider_accounts
-         (id, provider, label, credential_id, enabled, created_at, last_success_at)
-         VALUES (?, 'clinepass', ?, ?, 1, ?, ?)",
-    )
-    .bind(account_id)
-    .bind(account_label)
-    .bind(credential_id)
-    .bind(&now)
-    .bind(&now)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| CommandError::storage("无法保存账号配置"))?;
+    for account in accounts {
+        sqlx::query(
+            "INSERT INTO provider_accounts
+             (id, provider, label, plan, credential_id, enabled, created_at,
+              last_success_at, scope_id)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)",
+        )
+        .bind(&account.id)
+        .bind(provider)
+        .bind(&account.label)
+        .bind(&account.plan)
+        .bind(credential_id)
+        .bind(&now)
+        .bind(&now)
+        .bind(&account.scope_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| CommandError::storage("无法保存账号配置"))?;
+        write_windows(&mut tx, &account.id, &account.windows, &now).await?;
+    }
 
-    write_windows(&mut tx, account_id, windows, &now).await?;
     tx.commit()
         .await
         .map_err(|_| CommandError::storage("无法提交本地数据库事务"))
@@ -132,6 +209,7 @@ pub async fn update_success(
     pool: &SqlitePool,
     account_id: &str,
     credential_id: &str,
+    plan: Option<&str>,
     windows: &[QuotaWindowView],
 ) -> Result<(), CommandError> {
     let now = Utc::now().to_rfc3339();
@@ -142,10 +220,12 @@ pub async fn update_success(
     write_windows(&mut tx, account_id, windows, &now).await?;
     sqlx::query(
         "UPDATE provider_accounts
-         SET last_success_at = ?, last_error_category = NULL
+         SET last_success_at = ?, last_error_category = NULL,
+             plan = COALESCE(?, plan)
          WHERE id = ?",
     )
     .bind(&now)
+    .bind(plan)
     .bind(account_id)
     .execute(&mut *tx)
     .await
@@ -179,9 +259,11 @@ async fn account_rows(pool: &SqlitePool) -> Result<Vec<AccountRow>, CommandError
     sqlx::query_as::<_, AccountRow>(
         "SELECT a.id, a.provider, a.label, a.plan, a.credential_id,
                 c.label AS credential_label, a.enabled,
-                a.last_success_at, a.last_error_category
+                a.last_success_at, a.last_error_category,
+                n.label AS network_profile_label
          FROM provider_accounts a
          JOIN credentials c ON c.id = a.credential_id
+         LEFT JOIN network_profiles n ON n.id = c.network_profile_id
          ORDER BY a.created_at ASC",
     )
     .fetch_all(pool)
@@ -266,7 +348,10 @@ pub async fn connections(pool: &SqlitePool) -> Result<Vec<AccountConnectionView>
             plan: row.plan,
             credential_label: row.credential_label,
             shared_account_count,
-            route_mode_label: "默认网络栈 / TUN".into(),
+            route_mode_label: row
+                .network_profile_label
+                .map(|label| format!("固定出口 · {label}"))
+                .unwrap_or_else(|| "默认网络栈 / TUN".into()),
             state: if stale { "stale-with-error" } else { "ready" }.into(),
             freshness: if stale { "stale" } else { "fresh" }.into(),
             last_success_at: row.last_success_at,
@@ -278,28 +363,63 @@ pub async fn connections(pool: &SqlitePool) -> Result<Vec<AccountConnectionView>
     Ok(output)
 }
 
-pub async fn enabled_accounts(
+pub async fn refresh_targets(
     pool: &SqlitePool,
     account_id: Option<&str>,
-) -> Result<Vec<(String, String, String)>, CommandError> {
+) -> Result<Vec<RefreshTarget>, CommandError> {
+    let base = "SELECT a.id, a.provider, a.credential_id, a.scope_id,
+                       n.id AS network_profile_id, n.transport, n.host,
+                       n.port, n.has_auth
+                FROM provider_accounts a
+                JOIN credentials c ON c.id = a.credential_id
+                LEFT JOIN network_profiles n ON n.id = c.network_profile_id
+                WHERE a.enabled = 1";
     let rows = if let Some(id) = account_id {
-        sqlx::query_as::<_, (String, String, String)>(
-            "SELECT id, provider, credential_id
-             FROM provider_accounts WHERE enabled = 1 AND id = ?",
-        )
-        .bind(id)
-        .fetch_all(pool)
-        .await
+        sqlx::query_as::<_, RefreshTarget>(&format!("{base} AND a.id = ?"))
+            .bind(id)
+            .fetch_all(pool)
+            .await
     } else {
-        sqlx::query_as::<_, (String, String, String)>(
-            "SELECT id, provider, credential_id
-             FROM provider_accounts WHERE enabled = 1",
-        )
-        .fetch_all(pool)
-        .await
+        sqlx::query_as::<_, RefreshTarget>(base)
+            .fetch_all(pool)
+            .await
     }
     .map_err(|_| CommandError::storage("无法读取待刷新账号"))?;
     Ok(rows)
+}
+
+pub async fn network_profiles(pool: &SqlitePool) -> Result<Vec<NetworkProfileView>, CommandError> {
+    let rows = sqlx::query_as::<_, NetworkProfileRecord>(
+        "SELECT id, label, transport, host, port, has_auth
+         FROM network_profiles ORDER BY created_at ASC",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法读取固定出口"))?;
+    Ok(rows
+        .into_iter()
+        .map(|row| NetworkProfileView {
+            id: row.id,
+            label: row.label,
+            endpoint_label: format!("{} · {}:{}", row.transport, row.host, row.port),
+            has_auth: row.has_auth,
+        })
+        .collect())
+}
+
+pub async fn network_profile_by_id(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<NetworkProfileRecord, CommandError> {
+    sqlx::query_as::<_, NetworkProfileRecord>(
+        "SELECT id, label, transport, host, port, has_auth
+         FROM network_profiles WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法读取固定出口"))?
+    .ok_or_else(|| CommandError::validation("所选固定出口不存在"))
 }
 
 fn provider_name(provider: &str) -> &str {
@@ -343,13 +463,20 @@ mod tests {
             used_percent: 42.5,
             resets_at: Some("2026-08-03T00:00:00Z".into()),
         }];
-        insert_clinepass_account(
+        insert_provider_bundle(
             &pool,
-            "account-test",
-            "测试账号",
+            "clinepass",
             "credential-test",
             "测试凭据",
-            &windows,
+            None,
+            None,
+            &[NewAccountRecord {
+                id: "account-test".into(),
+                label: "测试账号".into(),
+                scope_id: None,
+                plan: None,
+                windows,
+            }],
         )
         .await
         .unwrap();
@@ -362,5 +489,49 @@ mod tests {
             connections(&pool).await.unwrap()[0].credential_label,
             "测试凭据"
         );
+    }
+
+    #[tokio::test]
+    async fn stores_network_profile_without_auth_secret() {
+        let directory = tempfile::tempdir().unwrap();
+        let pool = open(&directory.path().join("network.sqlite3"))
+            .await
+            .unwrap();
+        let profile = NewNetworkProfile {
+            id: "profile-test".into(),
+            label: "浏览器出口".into(),
+            transport: "socks5h".into(),
+            host: "127.0.0.1".into(),
+            port: 1080,
+            has_auth: true,
+        };
+        insert_provider_bundle(
+            &pool,
+            "ollama-cloud",
+            "credential-test",
+            "Cookie",
+            Some(&profile.id),
+            Some(&profile),
+            &[NewAccountRecord {
+                id: "account-test".into(),
+                label: "Ollama".into(),
+                scope_id: None,
+                plan: Some("Pro".into()),
+                windows: vec![],
+            }],
+        )
+        .await
+        .unwrap();
+        let options = network_profiles(&pool).await.unwrap();
+        assert_eq!(options[0].endpoint_label, "socks5h · 127.0.0.1:1080");
+        let columns: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_table_info('network_profiles') ORDER BY cid",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(!columns
+            .iter()
+            .any(|column| { column.contains("username") || column.contains("password") }));
     }
 }

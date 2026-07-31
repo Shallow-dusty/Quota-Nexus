@@ -5,28 +5,50 @@ import {
 } from "../data/phase0-fixtures";
 import type {
   AccountConnectionView,
+  NetworkProfileView,
   OverviewView,
+  ProviderKind,
   QuotaWindowView,
 } from "./quota-types";
 
-export interface ValidateClinePassInput {
-  apiKey: string;
+export type RouteSelectionInput =
+  | { mode: "default" }
+  | { mode: "existing"; profileId: string }
+  | {
+      mode: "new";
+      label: string;
+      proxyUrl: string;
+      username?: string;
+      password?: string;
+    };
+
+export interface ValidateProviderInput {
+  provider: ProviderKind;
+  secret: string;
+  workspaceId?: string;
+  route: RouteSelectionInput;
 }
 
-export interface CreateClinePassAccountInput {
+export interface CreateProviderAccountInput {
+  provider: ProviderKind;
   accountLabel: string;
   credentialLabel: string;
-  apiKey: string;
-  routeMode: "default";
+  secret: string;
+  workspaceId?: string;
+  route: RouteSelectionInput;
+}
+
+export interface ProviderValidationView {
+  windows: QuotaWindowView[];
+  discoveredAccountCount: number;
 }
 
 export interface QuotaClient {
   getOverview(): Promise<OverviewView>;
   getConnections(): Promise<AccountConnectionView[]>;
-  validateClinePass(input: ValidateClinePassInput): Promise<QuotaWindowView[]>;
-  createClinePassAccount(
-    input: CreateClinePassAccountInput,
-  ): Promise<AccountConnectionView[]>;
+  getNetworkProfiles(): Promise<NetworkProfileView[]>;
+  validateProvider(input: ValidateProviderInput): Promise<ProviderValidationView>;
+  createProviderAccount(input: CreateProviderAccountInput): Promise<AccountConnectionView[]>;
   refreshAll(): Promise<OverviewView>;
   refreshAccount(id: string): Promise<OverviewView>;
 }
@@ -46,18 +68,25 @@ class Phase0FixtureClient implements QuotaClient {
     return structuredClone(phase0Connections);
   }
 
-  async validateClinePass(
-    _input: ValidateClinePassInput,
-  ): Promise<QuotaWindowView[]> {
-    await new Promise((resolve) => window.setTimeout(resolve, 520));
-    return structuredClone(
-      phase0Overview.accounts.find((account) => account.provider === "clinepass")
-        ?.windows ?? [],
-    );
+  async getNetworkProfiles(): Promise<NetworkProfileView[]> {
+    return [];
   }
 
-  async createClinePassAccount(
-    _input: CreateClinePassAccountInput,
+  async validateProvider(
+    input: ValidateProviderInput,
+  ): Promise<ProviderValidationView> {
+    await new Promise((resolve) => window.setTimeout(resolve, 520));
+    const windows =
+      phase0Overview.accounts.find((account) => account.provider === input.provider)
+        ?.windows ?? [];
+    return {
+      windows: structuredClone(windows),
+      discoveredAccountCount: input.provider === "opencode-go" ? 2 : 1,
+    };
+  }
+
+  async createProviderAccount(
+    _input: CreateProviderAccountInput,
   ): Promise<AccountConnectionView[]> {
     await new Promise((resolve) => window.setTimeout(resolve, 420));
     return structuredClone(phase0Connections);
@@ -87,14 +116,18 @@ class TauriQuotaClient implements QuotaClient {
     return invoke("get_connections");
   }
 
-  validateClinePass(input: ValidateClinePassInput): Promise<QuotaWindowView[]> {
-    return invoke("validate_clinepass", { input });
+  getNetworkProfiles(): Promise<NetworkProfileView[]> {
+    return invoke("get_network_profiles");
   }
 
-  createClinePassAccount(
-    input: CreateClinePassAccountInput,
+  validateProvider(input: ValidateProviderInput): Promise<ProviderValidationView> {
+    return invoke("validate_provider", { input });
+  }
+
+  createProviderAccount(
+    input: CreateProviderAccountInput,
   ): Promise<AccountConnectionView[]> {
-    return invoke("create_clinepass_account", { input });
+    return invoke("create_provider_account", { input });
   }
 
   refreshAll(): Promise<OverviewView> {

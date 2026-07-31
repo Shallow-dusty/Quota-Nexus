@@ -84,3 +84,11 @@ export interface ProviderHealthView {
   nextProbeAt: string | null;
   consecutiveFailures: number;
 }
+
+/** 固定出口只向 UI 暴露脱敏端点；认证材料仍留在 Windows Credential Manager。 */
+export interface NetworkProfileView {
+  id: string;
+  label: string;
+  endpointLabel: string;
+  hasAuth: boolean;
+}
