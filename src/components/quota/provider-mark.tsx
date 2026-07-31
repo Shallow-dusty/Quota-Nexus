@@ -4,12 +4,12 @@ const META: Record<
   ProviderKind,
   { hue: string; glyph: string; title: string }
 > = {
-  clinepass: { hue: "var(--provider-clinepass)", glyph: "C", title: "Cline Pass" },
-  "opencode-go": { hue: "var(--provider-opencode)", glyph: "</>", title: "OpenCode Go" },
-  "ollama-cloud": { hue: "var(--provider-ollama)", glyph: "O", title: "Ollama Cloud" },
+  clinepass: { hue: "var(--provider-clinepass)", glyph: "CP", title: "Cline Pass" },
+  "opencode-go": { hue: "var(--provider-opencode)", glyph: "OC", title: "OpenCode Go" },
+  "ollama-cloud": { hue: "var(--provider-ollama)", glyph: "OL", title: "Ollama Cloud" },
 };
 
-/** 供应商识别标：克制配色，仅装饰用途，不承担健康语义（§11.3） */
+/** 供应商文字标：不伪造品牌 Logo，玻璃底色仅用于快速识别。 */
 export function ProviderMark({
   provider,
   size = 28,
@@ -21,15 +21,13 @@ export function ProviderMark({
   return (
     <span
       title={m.title}
-      className="inline-flex items-center justify-center rounded-lg font-semibold"
+      className="provider-mark inline-flex items-center justify-center font-semibold"
       style={{
         width: size,
         height: size,
-        fontSize: size <= 26 ? 11 : 13,
+        fontSize: size <= 26 ? 8.5 : 9.5,
         color: m.hue,
-        background: "color-mix(in srgb, currentColor 12%, transparent)",
-        border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
-        letterSpacing: provider === "opencode-go" ? "-0.04em" : 0,
+        letterSpacing: "-0.035em",
       }}
     >
       {m.glyph}

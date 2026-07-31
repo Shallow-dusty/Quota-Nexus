@@ -31,8 +31,8 @@ export function AccountsPage() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="flex flex-col gap-2.5">
+      <div className="page-scroll accounts-page flex-1 overflow-y-auto px-7 py-5">
+        <div className="connections-list flex flex-col gap-3">
           {phase0Connections.map((c) => (
             <ConnectionRow key={c.id} connection={c} now={now} />
           ))}
@@ -64,8 +64,8 @@ function ConnectionRow({
   });
 
   return (
-    <StableSurface className="px-4 py-3 flex items-center gap-3.5">
-      <ProviderMark provider={connection.provider} />
+    <StableSurface className="connection-row px-4 py-3.5 flex items-center gap-3.5">
+      <ProviderMark provider={connection.provider} size={32} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-[13.5px] font-medium text-ink-1 truncate">

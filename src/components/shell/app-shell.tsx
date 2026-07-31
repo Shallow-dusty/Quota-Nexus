@@ -34,51 +34,43 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="app-canvas h-full flex">
+    <div className="app-canvas app-shell h-full flex">
       <ControlGlass
         as="nav"
-        className={`shrink-0 flex flex-col transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
+        className={`app-sidebar shrink-0 flex flex-col transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
           collapsed ? "w-16" : "w-56"
         }`}
-        style={{ borderRight: "1px solid var(--line)" }}
       >
         <div
-          className={`flex items-center gap-2.5 h-14 shrink-0 ${
+          className={`app-brand flex items-center gap-2.5 h-16 shrink-0 ${
             collapsed ? "justify-center px-0" : "px-4"
           }`}
         >
-          <AppMark size={26} />
+          <AppMark size={32} />
           {!collapsed && (
-            <div className="leading-tight">
-              <div className="text-[13px] font-semibold tracking-tight text-ink-1">
+            <div className="brand-copy leading-tight">
+              <div className="text-[14px] font-semibold tracking-tight text-ink-1">
                 AI 额度中心
               </div>
-              <div className="text-[10.5px] text-ink-3 tracking-wider">QUOTA MONITOR</div>
+              <div className="text-[9.5px] text-ink-3 tracking-[0.18em] mt-1">
+                QUOTA MONITOR
+              </div>
             </div>
           )}
         </div>
 
-        <ul className="flex flex-col gap-1 px-2 py-2 flex-1">
+        <ul className="app-nav flex flex-col gap-1.5 px-2.5 py-3 flex-1">
           {NAV.map(({ id, label, icon: Icon }) => {
             const active = page === id;
             return (
               <li key={id}>
                 <Button
                   onPress={() => onPageChange(id)}
-                  className={`btn w-full ${collapsed ? "!px-0" : "!justify-start"}`}
+                  className={`btn nav-button w-full ${collapsed ? "!px-0" : "!justify-start"}`}
                   data-active={active}
-                  style={
-                    active
-                      ? {
-                          background: "var(--accent-soft)",
-                          color: "var(--accent)",
-                          fontWeight: 600,
-                        }
-                      : undefined
-                  }
                 >
                   <Icon size={16} className="shrink-0" />
-                  {!collapsed && <span>{label}</span>}
+                  {!collapsed && <span className="nav-label">{label}</span>}
                 </Button>
               </li>
             );
@@ -88,7 +80,7 @@ export function AppShell({
         <div className="p-2 border-t border-[var(--line)]">
           <Button
             onPress={onToggleCollapsed}
-            className="btn w-full !text-ink-3"
+            className="btn sidebar-collapse w-full !text-ink-3"
           >
             {collapsed ? (
               <PanelLeftOpen size={16} />
@@ -102,7 +94,9 @@ export function AppShell({
         </div>
       </ControlGlass>
 
-      <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      <main className="workspace-stage flex-1 min-w-0 flex flex-col">
+        {children}
+      </main>
     </div>
   );
 }
@@ -118,16 +112,16 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between gap-4 px-6 border-b border-[var(--line)]">
+    <header className="page-header h-[72px] shrink-0 flex items-center justify-between gap-4 px-7">
       <div className="min-w-0">
-        <h1 className="text-[19px] font-semibold leading-tight text-ink-1 truncate">
+        <h1 className="text-[22px] font-semibold leading-tight text-ink-1 truncate tracking-[-0.03em]">
           {title}
         </h1>
         {subtitle && (
-          <p className="text-[12px] text-ink-3 truncate mt-0.5">{subtitle}</p>
+          <p className="text-[12px] text-ink-3 truncate mt-1">{subtitle}</p>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="page-actions flex items-center gap-2 shrink-0">{actions}</div>}
     </header>
   );
 }

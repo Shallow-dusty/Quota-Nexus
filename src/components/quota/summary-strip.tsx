@@ -26,7 +26,7 @@ export function SummaryStrip({
   const nearest = nearestReset(accounts);
 
   return (
-    <StableSurface className="px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12.5px]">
+    <StableSurface className="summary-glass px-3 py-3 flex flex-wrap items-stretch gap-1 text-[12.5px]">
       <Metric
         icon={<Activity size={13} className="text-ink-3" />}
         label="正常账号"
@@ -37,7 +37,6 @@ export function SummaryStrip({
           </>
         }
       />
-      <Divider />
       <Metric
         icon={<AlertTriangle size={13} className="text-warn" />}
         label="需关注窗口"
@@ -46,7 +45,6 @@ export function SummaryStrip({
         }
         tone={attention > 0 ? "warn" : undefined}
       />
-      <Divider />
       <Metric
         icon={<Timer size={13} className="text-ink-3" />}
         label="最高使用"
@@ -66,7 +64,6 @@ export function SummaryStrip({
           )
         }
       />
-      <Divider />
       <Metric
         icon={<Clock3 size={13} className="text-ink-3" />}
         label="最近重置"
@@ -86,7 +83,7 @@ export function SummaryStrip({
           )
         }
       />
-      <span className="ml-auto text-[11.5px] text-ink-3">
+      <span className="summary-updated ml-auto self-center px-3 text-[11.5px] text-ink-3">
         上次刷新 {formatTime(refreshedAt)}
       </span>
     </StableSurface>
@@ -105,14 +102,10 @@ function Metric({
   tone?: "warn";
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="summary-metric inline-flex items-center gap-1.5">
       {icon}
       <span className={tone === "warn" ? "text-warn" : "text-ink-3"}>{label}</span>
       {value}
     </span>
   );
-}
-
-function Divider() {
-  return <span className="h-3.5 w-px bg-[var(--line)]" />;
 }

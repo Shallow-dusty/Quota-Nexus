@@ -44,9 +44,9 @@ export function ServiceQuotaCard({
   const stale = account.state === "stale-with-error";
 
   return (
-    <StableSurface className="p-4 flex flex-col gap-3">
-      <div className="flex items-start gap-2.5">
-        <ProviderMark provider={account.provider} />
+    <StableSurface className="quota-card p-4 flex flex-col gap-3">
+      <div className="quota-card-header flex items-start gap-3">
+        <ProviderMark provider={account.provider} size={32} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-[14px] font-semibold text-ink-1 truncate">
@@ -61,7 +61,7 @@ export function ServiceQuotaCard({
         <StatusBadge tone={tone} />
       </div>
 
-      <div className="flex flex-col gap-3 mt-0.5">
+      <div className="quota-windows flex flex-col gap-3.5 mt-1">
         {account.windows.map((w) => (
           <QuotaWindowRow key={w.id} window={w} now={now} />
         ))}
@@ -80,7 +80,7 @@ export function ServiceQuotaCard({
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-2 border-t border-[var(--line)]">
+      <div className="quota-card-footer flex items-center justify-between pt-2 border-t border-[var(--line)]">
         <span className="text-[11px] text-ink-3">
           上次成功 {formatDateTime(account.lastSuccessAt)}
           {account.freshness === "fresh" ? " · 数据新鲜" : " · 数据陈旧"}

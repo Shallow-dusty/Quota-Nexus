@@ -93,9 +93,9 @@ export function OverviewPage({
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="page-scroll overview-page flex-1 overflow-y-auto px-7 py-5">
         {accounts && (
-          <div className="mb-4">
+          <div className="mb-5">
             <SummaryStrip accounts={accounts} refreshedAt={refreshedAt} />
           </div>
         )}
@@ -122,7 +122,7 @@ export function OverviewPage({
           </Grid>
         )}
 
-        <div className="mt-4 text-[11px] text-ink-3">
+        <div className="data-provenance mt-5 text-[11px] text-ink-3">
           已连接 {phase0Connections.filter((c) => c.enabled).length}/
           {phase0Connections.length} 个账号 · 数据来源：Phase 0 脱敏样本
         </div>
@@ -134,7 +134,7 @@ export function OverviewPage({
 function Grid({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="grid gap-4"
+      className="quota-grid grid gap-4"
       style={{
         gridTemplateColumns:
           "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",

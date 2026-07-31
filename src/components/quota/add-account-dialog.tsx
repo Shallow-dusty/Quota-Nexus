@@ -54,11 +54,10 @@ export function AddAccountDialog({
       style={{ background: "rgba(15, 18, 26, 0.32)", backdropFilter: "blur(3px)" }}
     >
       <Modal>
-        <Dialog className="outline-none">
+        <Dialog className="outline-none" aria-label="添加账号">
           {({ close: closeDialog }) => (
             <FloatingGlass
-              className="w-[440px] max-w-full p-0 overflow-hidden"
-              style={{ borderRadius: "var(--r-lg)" }}
+              className="account-dialog w-[460px] max-w-full p-0 overflow-hidden"
             >
               {/* 步骤头 */}
               <div className="px-5 pt-4 pb-3 border-b border-[var(--line)]">

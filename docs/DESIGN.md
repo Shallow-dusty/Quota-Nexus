@@ -736,7 +736,18 @@ Liquid Glass 只表达空间层级，不改变 Windows 平台定位。所有表�
 | `ControlGlass` | 侧栏、工具栏、筛选条和分段选择器 | 中等透明、柔和高光 |
 | `FloatingGlass` | Tooltip、Popover、菜单、Toast、Dialog | 玻璃感最强，但面积小、停留短 |
 
-Layer-1 必须交付每种 surface × 浅/深色的材质参数表，包含 blur、saturate、背景不透明度
+当前 Layer-1 参数由 `src/styles/global.css` 的 token 统一控制：
+
+| 表面 | 浅色背景 | 深色背景 | blur | saturate | 边缘与阴影 |
+| --- | --- | --- | --- | --- | --- |
+| `StableSurface` | 白色 48% | 深蓝黑 50% | 24px | 1.42 | 亮色内沿 + 低位双层投影 |
+| `ControlGlass` | 冷白 38% | 深蓝黑 44% | 34px | 1.50 | 连续亮沿，控制层不做厚重投影 |
+| `FloatingGlass` | 白色 66% | 深蓝 72% | 46px | 1.62 | 最强亮沿 + 高位长投影 |
+
+三类表面都使用独立的场景色作为折射来源，而不是在卡片自身堆叠彩色渐变。关闭透明、
+系统要求减少透明度或浏览器不支持 `backdrop-filter` 时，分别回退到对应实色 token。
+
+每种 surface × 浅/深色的材质参数包含 blur、saturate、背景不透明度
 下限、1px 内高光、渐变边缘、阴影层级和 fallback。对浅/深色、聚焦/失焦、系统透明
 开/关组合，以应用允许透出的最亮/最暗背景样本测试最终合成结果；正文至少满足 4.5:1。
 不能满足时提高表面不透明度或启用 `GlassFallback`。不在长列表、图表主体或大面积数据区

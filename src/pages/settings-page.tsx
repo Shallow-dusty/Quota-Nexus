@@ -29,8 +29,8 @@ export function SettingsPage({
         title="设置"
         subtitle="刷新周期、通知、隐私、外观与诊断"
       />
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="max-w-[760px] flex flex-col gap-3">
+      <div className="page-scroll settings-page flex-1 overflow-y-auto px-7 py-5">
+        <div className="settings-grid max-w-[920px] grid grid-cols-2 gap-4">
           <Section icon={<Timer size={15} />} title="刷新">
             <Row label="刷新周期">
               <SegmentedControl
@@ -130,9 +130,9 @@ export function SettingsPage({
 
 function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
-    <StableSurface className="flex flex-col">
-      <div className="px-4 py-2.5 flex items-center gap-2 border-b border-[var(--line)]">
-        <span className="text-ink-3">{icon}</span>
+    <StableSurface className="settings-section flex flex-col">
+      <div className="section-heading px-4 py-3 flex items-center gap-2.5 border-b border-[var(--line)]">
+        <span className="section-icon text-ink-3">{icon}</span>
         <h3 className="text-[13px] font-semibold text-ink-1">{title}</h3>
       </div>
       <div className="flex flex-col">{children}</div>
@@ -162,10 +162,9 @@ function Toggle({ defaultOn = false, onChange }: { defaultOn?: boolean; onChange
         className="peer sr-only"
       />
       <span
-        className="w-9 h-5 rounded-full transition-colors peer-checked:bg-[var(--accent)]"
-        style={{ background: "var(--line-strong)" }}
+        className="toggle-track w-9 h-5 rounded-full transition-colors"
       />
-      <span className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+      <span className="toggle-thumb absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" />
     </label>
   );
 }
