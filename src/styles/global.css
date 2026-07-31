@@ -968,3 +968,26 @@ input:checked ~ .toggle-thumb {
   text-shadow: 0 0 8px var(--ink-2);
   user-select: none;
 }
+
+@media (forced-colors: active) {
+  .app-shell,
+  .workspace-stage,
+  .app-sidebar,
+  .surface-stable,
+  .surface-floating,
+  .btn,
+  .segmented,
+  .badge {
+    forced-color-adjust: auto;
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .quota-fill,
+  .toggle-track {
+    background: Highlight !important;
+  }
+}

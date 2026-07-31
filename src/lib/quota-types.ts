@@ -14,6 +14,7 @@ export type DataState =
   | "ready"
   | "refreshing"
   | "stale-with-error"
+  | "paused"
   | "empty";
 
 export type WindowKind =
@@ -105,6 +106,16 @@ export interface CredentialOptionView {
   sharedAccountCount: number;
   routeModeLabel: string;
   lastValidatedAt: string | null;
+}
+
+export interface HistoryPointView {
+  accountId: string;
+  provider: ProviderKind;
+  accountLabel: string;
+  windowKind: WindowKind;
+  windowLabel: string;
+  usedPercent: number;
+  observedAt: string;
 }
 
 export interface AppSettingsView {

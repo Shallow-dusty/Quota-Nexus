@@ -1,9 +1,20 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    io::Write,
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
+use chrono::Utc;
 use futures::{stream, StreamExt};
 use reqwest::Client;
 use sqlx::SqlitePool;
-use tauri::State;
+use tauri::{Emitter, Manager, State};
+use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
+use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Semaphore;
 use uuid::Uuid;
 use zeroize::Zeroizing;
@@ -12,9 +23,9 @@ use crate::{
     clinepass, credential,
     domain::{
         AccountConnectionView, AppSettingsView, CreateProviderAccountInput, CredentialOptionView,
-        NetworkProfileView, OverviewView, ProviderHealthView, ProviderValidationView,
-        RouteSelectionInput, UpdateAccountInput, UpdateCredentialInput, UpdateSettingsInput,
-        ValidateProviderInput,
+        HistoryPointView, NetworkProfileView, OverviewView, ProviderHealthView,
+        ProviderValidationView, RouteSelectionInput, UpdateAccountInput, UpdateCredentialInput,
+        UpdateNetworkProfileInput, UpdateSettingsInput, ValidateProviderInput,
     },
     error::CommandError,
     network::{self, NewNetworkProfile},
@@ -23,6 +34,7 @@ use crate::{
 
 pub struct AppState {
     pub db: SqlitePool,
+    pub tray_enabled: Arc<AtomicBool>,
 }
 
 struct ResolvedRoute {
@@ -59,6 +71,77 @@ pub async fn get_network_profiles(
 }
 
 #[tauri::command]
+pub async fn update_network_profile(
+    state: State<'_, AppState>,
+    input: UpdateNetworkProfileInput,
+) -> Result<Vec<NetworkProfileView>, CommandError> {
+    let id = input.id.trim();
+    if id.is_empty() {
+        return Err(CommandError::validation("请选择要更新的固定出口"));
+    }
+    let existing = storage::network_profile_by_id(&state.db, id).await?;
+    let old_auth = if existing.has_auth {
+        Some(credential::load_proxy_auth(id)?)
+    } else {
+        None
+    };
+    let (mut profile, new_auth) = network::parse_new_profile(
+        id.to_string(),
+        &input.label,
+        &input.proxy_url,
+        input.username.as_deref(),
+        input.password.as_deref(),
+    )?;
+    let preserve_auth = new_auth.is_none() && !input.clear_auth;
+    profile.has_auth = new_auth.is_some() || (preserve_auth && existing.has_auth);
+    let selected_auth = if let Some((username, password)) = &new_auth {
+        Some(crate::credential::ProxyAuth {
+            username: Zeroizing::new(username.clone()),
+            password: Zeroizing::new(password.clone()),
+        })
+    } else if preserve_auth {
+        old_auth.as_ref().map(|auth| crate::credential::ProxyAuth {
+            username: Zeroizing::new(auth.username.to_string()),
+            password: Zeroizing::new(auth.password.to_string()),
+        })
+    } else {
+        None
+    };
+    let client_auth = selected_auth
+        .as_ref()
+        .map(|auth| (auth.username.to_string(), auth.password.to_string()));
+    network::build_new_profile_client(&profile, client_auth.as_ref())?;
+    if let Some((username, password)) = &new_auth {
+        credential::store_proxy_auth(id, username, password)?;
+    }
+    if let Err(error) = storage::update_network_profile(&state.db, &profile).await {
+        if let Some(auth) = old_auth.as_ref() {
+            let _ = credential::store_proxy_auth(id, &auth.username, &auth.password);
+        } else if new_auth.is_some() {
+            let _ = credential::delete_proxy_auth(id);
+        }
+        return Err(error);
+    }
+    if input.clear_auth && existing.has_auth {
+        credential::delete_proxy_auth(id)?;
+    }
+    storage::network_profiles(&state.db).await
+}
+
+#[tauri::command]
+pub async fn delete_network_profile(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Vec<NetworkProfileView>, CommandError> {
+    let id = id.trim();
+    let had_auth = storage::delete_network_profile(&state.db, id).await?;
+    if had_auth {
+        credential::delete_proxy_auth(id)?;
+    }
+    storage::network_profiles(&state.db).await
+}
+
+#[tauri::command]
 pub async fn get_credentials(
     state: State<'_, AppState>,
 ) -> Result<Vec<CredentialOptionView>, CommandError> {
@@ -72,10 +155,44 @@ pub async fn get_settings(state: State<'_, AppState>) -> Result<AppSettingsView,
 
 #[tauri::command]
 pub async fn update_settings(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     input: UpdateSettingsInput,
 ) -> Result<AppSettingsView, CommandError> {
-    storage::update_settings(&state.db, input).await
+    let previous = storage::settings(&state.db).await?;
+    apply_autostart(&app, input.autostart_enabled)?;
+    let tray_enabled = input.tray_enabled;
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        if let Err(_error) = tray.set_visible(tray_enabled) {
+            let _ = apply_autostart(&app, previous.autostart_enabled);
+            return Err(CommandError::storage("无法更新托盘状态"));
+        }
+    }
+    let stored = match storage::update_settings(&state.db, input).await {
+        Ok(stored) => stored,
+        Err(error) => {
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                let _ = tray.set_visible(previous.tray_enabled);
+            }
+            let _ = apply_autostart(&app, previous.autostart_enabled);
+            return Err(error);
+        }
+    };
+    state.tray_enabled.store(tray_enabled, Ordering::Relaxed);
+    Ok(stored)
+}
+
+fn apply_autostart(app: &tauri::AppHandle, enabled: bool) -> Result<(), CommandError> {
+    if enabled {
+        app.autolaunch()
+            .enable()
+            .map_err(|_| CommandError::storage("无法启用开机自启"))?;
+    } else {
+        app.autolaunch()
+            .disable()
+            .map_err(|_| CommandError::storage("无法关闭开机自启"))?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -83,6 +200,167 @@ pub async fn get_provider_health(
     state: State<'_, AppState>,
 ) -> Result<Vec<ProviderHealthView>, CommandError> {
     storage::provider_health(&state.db).await
+}
+
+#[tauri::command]
+pub async fn get_history(
+    state: State<'_, AppState>,
+    days: i64,
+) -> Result<Vec<HistoryPointView>, CommandError> {
+    storage::history(&state.db, days).await
+}
+
+#[tauri::command]
+pub async fn export_latest_snapshot(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, CommandError> {
+    let overview = storage::overview(&state.db).await?;
+    let document = sanitized_snapshot(&overview);
+    let directory = app
+        .path()
+        .download_dir()
+        .map_err(|_| CommandError::storage("无法定位下载目录"))?;
+    let filename = format!(
+        "ai-quota-snapshot-{}.json",
+        Utc::now().format("%Y%m%d-%H%M%S")
+    );
+    let path = directory.join(filename);
+    let contents = serde_json::to_vec_pretty(&document)
+        .map_err(|_| CommandError::storage("无法生成脱敏快照"))?;
+    std::fs::write(&path, contents).map_err(|_| CommandError::storage("无法写入脱敏快照"))?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn get_diagnostic_manifest() -> Vec<&'static str> {
+    vec![
+        "manifest.json（应用版本、系统、数据库 schema）",
+        "provider-health.json（供应商熔断与成功时间）",
+        "settings.json（无秘密的应用设置）",
+        "latest-snapshot.json（脱敏后的最新额度）",
+    ]
+}
+
+#[tauri::command]
+pub async fn export_diagnostics(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, CommandError> {
+    let overview = storage::overview(&state.db).await?;
+    let health = storage::provider_health(&state.db).await?;
+    let settings = storage::settings(&state.db).await?;
+    let schema_version: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
+        .fetch_one(&state.db)
+        .await
+        .map_err(|_| CommandError::storage("无法读取数据库 schema 版本"))?;
+    let generated_at = Utc::now();
+    let manifest = serde_json::json!({
+        "application": "AI Quota Monitor",
+        "version": env!("CARGO_PKG_VERSION"),
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+        "schemaVersion": schema_version,
+        "generatedAt": generated_at.to_rfc3339(),
+        "files": get_diagnostic_manifest(),
+    });
+    let directory = app
+        .path()
+        .download_dir()
+        .map_err(|_| CommandError::storage("无法定位下载目录"))?;
+    let path = directory.join(format!(
+        "ai-quota-diagnostics-{}.zip",
+        generated_at.format("%Y%m%d-%H%M%S")
+    ));
+    let entries = diagnostic_entries(manifest, health, settings, sanitized_snapshot(&overview))?;
+    write_diagnostic_archive(&path, &entries)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn diagnostic_entries(
+    manifest: serde_json::Value,
+    health: Vec<ProviderHealthView>,
+    settings: AppSettingsView,
+    snapshot: serde_json::Value,
+) -> Result<Vec<(&'static str, Vec<u8>)>, CommandError> {
+    [
+        ("manifest.json", manifest),
+        (
+            "provider-health.json",
+            serde_json::to_value(health)
+                .map_err(|_| CommandError::storage("无法序列化供应商诊断"))?,
+        ),
+        (
+            "settings.json",
+            serde_json::to_value(settings)
+                .map_err(|_| CommandError::storage("无法序列化应用设置"))?,
+        ),
+        ("latest-snapshot.json", snapshot),
+    ]
+    .into_iter()
+    .map(|(name, value)| {
+        serde_json::to_vec_pretty(&value)
+            .map(|bytes| (name, bytes))
+            .map_err(|_| CommandError::storage("无法生成诊断内容"))
+    })
+    .collect()
+}
+
+fn write_diagnostic_archive(
+    path: &Path,
+    entries: &[(&'static str, Vec<u8>)],
+) -> Result<(), CommandError> {
+    let file = std::fs::File::create(path).map_err(|_| CommandError::storage("无法创建诊断包"))?;
+    let mut archive = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    for (name, bytes) in entries {
+        archive
+            .start_file(name, options)
+            .map_err(|_| CommandError::storage("无法写入诊断包"))?;
+        archive
+            .write_all(bytes)
+            .map_err(|_| CommandError::storage("无法写入诊断内容"))?;
+    }
+    archive
+        .finish()
+        .map_err(|_| CommandError::storage("无法完成诊断包"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn send_test_notification(app: tauri::AppHandle) -> Result<(), CommandError> {
+    app.notification()
+        .builder()
+        .title("AI Quota Monitor")
+        .body("Windows 通知已连接；正式告警会按状态代次去重。")
+        .show()
+        .map_err(|_| CommandError::storage("无法发送 Windows 通知"))
+}
+
+fn sanitized_snapshot(overview: &OverviewView) -> serde_json::Value {
+    let accounts = overview
+        .accounts
+        .iter()
+        .map(|account| {
+            serde_json::json!({
+                "provider": account.provider,
+                "providerName": account.provider_name,
+                "plan": account.plan,
+                "state": account.state,
+                "freshness": account.freshness,
+                "lastSuccessAt": account.last_success_at,
+                "errorCategory": account.error_category,
+                "windows": account.windows,
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::json!({
+        "schemaVersion": 1,
+        "exportedAt": Utc::now().to_rfc3339(),
+        "refreshedAt": overview.refreshed_at,
+        "accounts": accounts,
+    })
 }
 
 #[tauri::command]
@@ -242,28 +520,48 @@ pub async fn update_account(
 }
 
 #[tauri::command]
-pub async fn refresh_all(state: State<'_, AppState>) -> Result<OverviewView, CommandError> {
-    refresh(&state.db, None, true).await.map(|result| result.0)
+pub async fn delete_account(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Vec<AccountConnectionView>, CommandError> {
+    let outcome = storage::delete_account(&state.db, id.trim()).await?;
+    if let Some(credential_id) = outcome.credential_id {
+        credential::delete(&credential_id)?;
+    }
+    storage::connections(&state.db).await
+}
+
+#[tauri::command]
+pub async fn refresh_all(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<OverviewView, CommandError> {
+    let overview = refresh(&app, &state.db, None, true).await?.0;
+    let _ = app.emit("overview-updated", &overview);
+    Ok(overview)
 }
 
 #[tauri::command]
 pub async fn refresh_account(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     id: String,
 ) -> Result<OverviewView, CommandError> {
-    refresh(&state.db, Some(id.as_str()), true)
-        .await
-        .map(|result| result.0)
+    let overview = refresh(&app, &state.db, Some(id.as_str()), true).await?.0;
+    let _ = app.emit("overview-updated", &overview);
+    Ok(overview)
 }
 
 pub(crate) async fn scheduled_refresh(
+    app: &tauri::AppHandle,
     pool: &SqlitePool,
 ) -> Result<Option<OverviewView>, CommandError> {
-    let (overview, refreshed) = refresh(pool, None, false).await?;
+    let (overview, refreshed) = refresh(app, pool, None, false).await?;
     Ok((refreshed > 0).then_some(overview))
 }
 
 async fn refresh(
+    app: &tauri::AppHandle,
     pool: &SqlitePool,
     account_id: Option<&str>,
     manual: bool,
@@ -282,6 +580,7 @@ async fn refresh(
         ("ollama-cloud".to_string(), Arc::new(Semaphore::new(2))),
     ]));
     let results = stream::iter(targets.into_iter().map(|target| {
+        let app = app.clone();
         let pool = pool.clone();
         let semaphore = provider_limits
             .get(&target.provider)
@@ -292,7 +591,7 @@ async fn refresh(
                 .acquire_owned()
                 .await
                 .map_err(|_| CommandError::network("刷新并发控制器已关闭"))?;
-            refresh_target(&pool, target).await
+            refresh_target(&app, &pool, target).await
         }
     }))
     .buffer_unordered(4)
@@ -305,6 +604,7 @@ async fn refresh(
 }
 
 async fn refresh_target(
+    app: &tauri::AppHandle,
     pool: &SqlitePool,
     target: storage::RefreshTarget,
 ) -> Result<(), CommandError> {
@@ -313,6 +613,8 @@ async fn refresh_target(
         Ok(secret) => secret,
         Err(_) => {
             storage::update_failure(pool, &target, &CommandError::auth(), explicit).await?;
+            let events = storage::evaluate_health_alert(pool, &target.id, "auth").await?;
+            send_alerts(app, events);
             return Ok(());
         }
     };
@@ -320,6 +622,13 @@ async fn refresh_target(
         Ok(client) => client,
         Err(error) => {
             storage::update_failure(pool, &target, &error, explicit).await?;
+            let category = if explicit && error.code == "network" {
+                "proxy"
+            } else {
+                error.category()
+            };
+            let events = storage::evaluate_health_alert(pool, &target.id, category).await?;
+            send_alerts(app, events);
             return Ok(());
         }
     };
@@ -348,9 +657,34 @@ async fn refresh_target(
                 plan.as_deref(),
                 &windows,
             )
-            .await
+            .await?;
+            let mut events = storage::evaluate_quota_alerts(pool, &target.id, &windows).await?;
+            events.extend(storage::evaluate_health_alert(pool, &target.id, "normal").await?);
+            send_alerts(app, events);
+            Ok(())
         }
-        Err(error) => storage::update_failure(pool, &target, &error, explicit).await,
+        Err(error) => {
+            storage::update_failure(pool, &target, &error, explicit).await?;
+            let category = if explicit && error.code == "network" {
+                "proxy"
+            } else {
+                error.category()
+            };
+            let events = storage::evaluate_health_alert(pool, &target.id, category).await?;
+            send_alerts(app, events);
+            Ok(())
+        }
+    }
+}
+
+fn send_alerts(app: &tauri::AppHandle, events: Vec<storage::AlertEvent>) {
+    for event in events {
+        let _ = app
+            .notification()
+            .builder()
+            .title(event.title)
+            .body(event.body)
+            .show();
     }
 }
 
@@ -584,5 +918,122 @@ mod tests {
         let masked = masked_workspace_suffix("wrk_01ABCDEF");
         assert_eq!(masked, "wrk_••••CDEF");
         assert!(!masked.contains("01AB"));
+    }
+
+    #[test]
+    fn snapshot_export_omits_local_identity_and_credential_fields() {
+        let overview = OverviewView {
+            accounts: vec![crate::domain::ServiceQuotaView {
+                id: "private-account-id".into(),
+                provider: "clinepass".into(),
+                provider_name: "Cline Pass".into(),
+                account_label: "private-account-label".into(),
+                plan: Some("Pro".into()),
+                state: "ready".into(),
+                freshness: "fresh".into(),
+                last_success_at: Some("2026-07-31T00:00:00Z".into()),
+                error_category: None,
+                windows: vec![crate::domain::QuotaWindowView {
+                    id: "weekly".into(),
+                    kind: "weekly".into(),
+                    label: "周额度".into(),
+                    used_percent: 42.0,
+                    resets_at: None,
+                }],
+            }],
+            refreshed_at: Some("2026-07-31T00:00:00Z".into()),
+            source: "tauri",
+        };
+        let export = sanitized_snapshot(&overview).to_string();
+        assert!(!export.contains("private-account-id"));
+        assert!(!export.contains("private-account-label"));
+        assert!(!export.contains("credential"));
+        assert!(export.contains("clinepass"));
+        assert!(export.contains("42.0"));
+    }
+
+    #[test]
+    fn diagnostic_archive_contains_only_declared_redacted_json() {
+        use std::io::Read;
+
+        let overview = OverviewView {
+            accounts: vec![crate::domain::ServiceQuotaView {
+                id: "private-account-id".into(),
+                provider: "ollama-cloud".into(),
+                provider_name: "Ollama Cloud".into(),
+                account_label: "private-account-label".into(),
+                plan: Some("Pro".into()),
+                state: "ready".into(),
+                freshness: "fresh".into(),
+                last_success_at: Some("2026-07-31T00:00:00Z".into()),
+                error_category: None,
+                windows: vec![crate::domain::QuotaWindowView {
+                    id: "weekly".into(),
+                    kind: "weekly".into(),
+                    label: "周额度".into(),
+                    used_percent: 27.0,
+                    resets_at: None,
+                }],
+            }],
+            refreshed_at: Some("2026-07-31T00:00:00Z".into()),
+            source: "tauri",
+        };
+        let manifest = serde_json::json!({
+            "application": "AI Quota Monitor",
+            "files": get_diagnostic_manifest(),
+        });
+        let health = vec![ProviderHealthView {
+            provider: "ollama-cloud".into(),
+            provider_name: "Ollama Cloud".into(),
+            circuit_state: "closed".into(),
+            last_success_at: Some("2026-07-31T00:00:00Z".into()),
+            next_probe_at: None,
+            consecutive_failures: 0,
+        }];
+        let settings = AppSettingsView {
+            refresh_interval_minutes: Some(15),
+            adaptive_refresh: true,
+            warning_threshold: 70.0,
+            high_threshold: 85.0,
+            critical_threshold: 95.0,
+            history_days: Some(30),
+            tray_enabled: true,
+            autostart_enabled: false,
+            privacy_mode: false,
+            notify_auth: true,
+            notify_stale: true,
+            notify_recovery: false,
+        };
+        let entries =
+            diagnostic_entries(manifest, health, settings, sanitized_snapshot(&overview)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("diagnostics.zip");
+        write_diagnostic_archive(&path, &entries).unwrap();
+
+        let file = std::fs::File::open(path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        assert_eq!(archive.len(), 4);
+        let mut combined = String::new();
+        for expected in [
+            "manifest.json",
+            "provider-health.json",
+            "settings.json",
+            "latest-snapshot.json",
+        ] {
+            let mut entry = archive.by_name(expected).unwrap();
+            entry.read_to_string(&mut combined).unwrap();
+        }
+        assert!(!combined.contains("private-account-id"));
+        assert!(!combined.contains("private-account-label"));
+        for forbidden in [
+            "Cookie",
+            "Authorization",
+            "apiKey",
+            "credentialId",
+            "proxyUrl",
+        ] {
+            assert!(!combined.contains(forbidden));
+        }
+        assert!(combined.contains("Ollama Cloud"));
     }
 }

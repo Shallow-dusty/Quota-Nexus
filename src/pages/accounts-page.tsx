@@ -6,6 +6,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { useEffect, useState } from "react";
@@ -54,10 +55,14 @@ export function AccountsPage() {
     setLoadError(null);
     try {
       await action();
-      await reload();
     } catch (reason) {
       setLoadError(commandErrorMessage(reason));
     } finally {
+      try {
+        await reload();
+      } catch (reason) {
+        setLoadError(commandErrorMessage(reason));
+      }
       setBusyId(null);
     }
   }
@@ -103,6 +108,15 @@ export function AccountsPage() {
               }
               onEdit={() => setEditing(connection)}
               onCredential={() => setCredentialAccount(connection)}
+              onDelete={() => {
+                if (
+                  window.confirm(
+                    `仅从本机删除“${connection.accountLabel}”及其历史记录？`,
+                  )
+                ) {
+                  void act(connection.id, () => quotaClient.deleteAccount(connection.id));
+                }
+              }}
             />
           ))}
           {connections?.length === 0 && (
@@ -149,6 +163,7 @@ function ConnectionRow({
   onToggle,
   onEdit,
   onCredential,
+  onDelete,
 }: {
   connection: AccountConnectionView;
   now: number;
@@ -157,6 +172,7 @@ function ConnectionRow({
   onToggle: () => void;
   onEdit: () => void;
   onCredential: () => void;
+  onDelete: () => void;
 }) {
   const tone = toneForAccount({
     id: connection.id,
@@ -244,6 +260,14 @@ function ConnectionRow({
           aria-label="编辑账号标签"
         >
           <Pencil size={14} />
+        </Button>
+        <Button
+          className="btn btn-icon"
+          onPress={onDelete}
+          isDisabled={busy}
+          aria-label="删除本地账号"
+        >
+          <Trash2 size={14} />
         </Button>
       </div>
     </StableSurface>

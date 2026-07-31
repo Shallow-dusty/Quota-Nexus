@@ -1,4 +1,4 @@
-import { ArrowDownWideNarrow, Plus, RefreshCw } from "lucide-react";
+import { ArrowDownWideNarrow, Download, Plus, RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useEffect, useMemo, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
@@ -10,6 +10,7 @@ import { SkeletonCard } from "../components/ui/skeleton";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
 import { SummaryStrip } from "../components/quota/summary-strip";
 import { StableSurface } from "../components/ui/surface";
+import { HistoryTrend } from "../components/quota/history-trend";
 
 type Filter = "all" | "attention" | "stale";
 
@@ -25,8 +26,9 @@ export function OverviewPage({
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [exportPath, setExportPath] = useState<string | null>(null);
 
-  // 首屏一次性加载（静态阶段；接入 Tauri 后由 TanStack Query 承载）
+  // Rust Core 是唯一刷新时钟；页面只接收首屏 DTO 与后续 overview-updated 事件。
   useEffect(() => {
     let cancelled = false;
     void quotaClient
@@ -68,7 +70,12 @@ export function OverviewPage({
   const visible = useMemo(() => {
     if (!accounts) return [];
     const filtered = accounts.filter((a) => {
-      if (filter === "attention") return a.state !== "stale-with-error";
+      if (filter === "attention") {
+        return (
+          a.state === "stale-with-error" ||
+          a.windows.some((window) => window.usedPercent >= 70)
+        );
+      }
       if (filter === "stale") return a.state === "stale-with-error";
       return true;
     });
@@ -125,6 +132,20 @@ export function OverviewPage({
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
               <span>全部刷新</span>
             </Button>
+            <Button
+              className="btn btn-outline"
+              onPress={async () => {
+                setLoadError(null);
+                try {
+                  setExportPath(await quotaClient.exportLatestSnapshot());
+                } catch (reason) {
+                  setLoadError(commandErrorMessage(reason));
+                }
+              }}
+            >
+              <Download size={14} />
+              导出快照
+            </Button>
           </>
         }
       />
@@ -134,6 +155,12 @@ export function OverviewPage({
           <StableSurface className="mb-4 px-4 py-3">
             <p className="text-[12.5px] text-ink-2">额度数据读取失败</p>
             <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
+          </StableSurface>
+        )}
+        {exportPath && (
+          <StableSurface className="mb-4 px-4 py-3">
+            <p className="text-[12px] text-ink-2">脱敏快照已导出</p>
+            <p className="mt-0.5 break-all text-[11px] text-ink-3">{exportPath}</p>
           </StableSurface>
         )}
         {accounts && (
@@ -158,7 +185,7 @@ export function OverviewPage({
                 account={account}
                 refreshing={cardRefreshing === account.id}
                 onRefresh={refreshAccount}
-                onMore={onMore}
+                onMore={() => onPageChange("accounts")}
               />
             ))}
           </Grid>
@@ -168,6 +195,7 @@ export function OverviewPage({
           已连接 {accounts?.length ?? 0} 个账号 · 数据来源：
           {source === "tauri" ? "本机实时 Core" : "Phase 0 脱敏样本"}
         </div>
+        <HistoryTrend />
       </div>
     </>
   );
@@ -212,8 +240,4 @@ function EmptyOverview({
       </Button>
     </div>
   );
-}
-
-function onMore(_id: string) {
-  // 静态阶段：更多操作入口占位（更新凭据/暂停/删除等在 Phase 1 后端接入后实现）
 }

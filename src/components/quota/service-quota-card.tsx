@@ -10,7 +10,7 @@ import {
 import type { ErrorCategory, ServiceQuotaView } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
 import { StableSurface } from "../ui/surface";
-import { PlanBadge, StatusBadge } from "../ui/status-badge";
+import { PausedBadge, PlanBadge, StatusBadge } from "../ui/status-badge";
 import { ProviderMark } from "./provider-mark";
 import { QuotaWindowRow } from "./quota-window-row";
 
@@ -42,6 +42,7 @@ export function ServiceQuotaCard({
   const now = useNow();
   const tone = toneForAccount(account);
   const stale = account.state === "stale-with-error";
+  const paused = account.state === "paused";
 
   return (
     <StableSurface className="quota-card p-4 flex flex-col gap-3">
@@ -58,7 +59,7 @@ export function ServiceQuotaCard({
             {account.providerName}
           </p>
         </div>
-        <StatusBadge tone={tone} />
+        {paused ? <PausedBadge /> : <StatusBadge tone={tone} />}
       </div>
 
       <div className="quota-windows flex flex-col gap-3.5 mt-1">
@@ -88,7 +89,7 @@ export function ServiceQuotaCard({
         <div className="flex items-center gap-1">
           <Button
             onPress={() => onRefresh?.(account.id)}
-            isDisabled={refreshing || stale}
+            isDisabled={refreshing || stale || paused}
             className="btn btn-icon"
             aria-label="刷新此账号"
           >

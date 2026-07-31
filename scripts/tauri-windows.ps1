@@ -23,4 +23,38 @@ if (-not $nativeLink -or -not $nativeCompiler) {
 }
 
 & pnpm tauri $Mode
-exit $LASTEXITCODE
+$tauriExitCode = $LASTEXITCODE
+
+if ($tauriExitCode -eq 0 -and $Mode -eq "build") {
+    $bundleDirectory = Join-Path $PSScriptRoot "..\target\release\bundle\nsis"
+    $installer = Get-ChildItem -LiteralPath $bundleDirectory -Filter "*.exe" |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+    if (-not $installer) {
+        throw "NSIS installer was not found after a successful Tauri build"
+    }
+    $stream = [System.IO.File]::OpenRead($installer.FullName)
+    try {
+        $algorithm = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $hashBytes = $algorithm.ComputeHash($stream)
+            $hash = ([System.BitConverter]::ToString($hashBytes)).Replace("-", "")
+        }
+        finally {
+            $algorithm.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+    $checksumPath = "$($installer.FullName).sha256"
+    $line = "$hash  $($installer.Name)`n"
+    [System.IO.File]::WriteAllText(
+        $checksumPath,
+        $line,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Write-Host "SHA-256: $checksumPath"
+}
+
+exit $tauriExitCode

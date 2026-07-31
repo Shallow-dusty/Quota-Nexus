@@ -126,6 +126,32 @@ pub struct CredentialOptionView {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct HistoryPointView {
+    pub account_id: String,
+    pub provider: String,
+    pub account_label: String,
+    pub window_kind: String,
+    pub window_label: String,
+    pub used_percent: f64,
+    pub observed_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateNetworkProfileInput {
+    pub id: String,
+    pub label: String,
+    pub proxy_url: String,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+    #[serde(default)]
+    pub clear_auth: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProviderValidationView {
     pub windows: Vec<QuotaWindowView>,
     pub discovered_account_count: usize,

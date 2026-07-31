@@ -1,19 +1,23 @@
 import {
   Bell,
   Eye,
+  Globe2,
   History,
   LayoutGrid,
   MonitorSmartphone,
   Palette,
   ShieldCheck,
+  Trash2,
   Timer,
 } from "lucide-react";
+import { Button } from "react-aria-components";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { formatRelativePast } from "../lib/format";
 import type {
   AppSettingsView,
+  NetworkProfileView,
   ProviderHealthView,
   ThemePreference,
 } from "../lib/quota-types";
@@ -40,16 +44,24 @@ export function SettingsPage({
   const now = useNow();
   const [settings, setSettings] = useState<AppSettingsView | null>(null);
   const [health, setHealth] = useState<ProviderHealthView[]>([]);
+  const [networkProfiles, setNetworkProfiles] = useState<NetworkProfileView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [diagnosticFiles, setDiagnosticFiles] = useState<string[]>([]);
+  const [diagnosticPath, setDiagnosticPath] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    Promise.all([quotaClient.getSettings(), quotaClient.getProviderHealth()])
-      .then(([nextSettings, nextHealth]) => {
+    Promise.all([
+      quotaClient.getSettings(),
+      quotaClient.getProviderHealth(),
+      quotaClient.getNetworkProfiles(),
+    ])
+      .then(([nextSettings, nextHealth, nextProfiles]) => {
         if (!active) return;
         setSettings(nextSettings);
         setHealth(nextHealth);
+        setNetworkProfiles(nextProfiles);
         onPrivacyChange?.(nextSettings.privacyMode);
       })
       .catch((reason) => active && setError(commandErrorMessage(reason)));
@@ -179,6 +191,20 @@ export function SettingsPage({
                 onChange={(notifyRecovery) => save({ notifyRecovery })}
               />
             </Row>
+            <div className="px-4 py-3">
+              <Button
+                className="btn btn-outline"
+                onPress={async () => {
+                  try {
+                    await quotaClient.sendTestNotification();
+                  } catch (reason) {
+                    setError(commandErrorMessage(reason));
+                  }
+                }}
+              >
+                发送测试通知
+              </Button>
+            </div>
           </Section>
 
           <Section icon={<History size={15} />} title="历史保留">
@@ -239,12 +265,202 @@ export function SettingsPage({
             </Row>
           </Section>
 
+          <Section icon={<Globe2 size={15} />} title="固定出口">
+            <NetworkProfilesEditor
+              profiles={networkProfiles}
+              onChange={setNetworkProfiles}
+              onError={setError}
+            />
+          </Section>
+
           <Section icon={<LayoutGrid size={15} />} title="诊断">
             <ProviderHealthTable health={health} now={now} />
+            <div className="border-t border-[var(--line)] px-4 py-3">
+              {diagnosticFiles.length > 0 && (
+                <ul className="mb-3 list-disc pl-4 text-[11px] text-ink-3">
+                  {diagnosticFiles.map((file) => <li key={file}>{file}</li>)}
+                </ul>
+              )}
+              {diagnosticPath && (
+                <p className="mb-3 break-all text-[11px] text-[var(--ok)]">
+                  已导出：{diagnosticPath}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  className="btn btn-outline"
+                  onPress={async () => {
+                    try {
+                      setDiagnosticFiles(await quotaClient.getDiagnosticManifest());
+                    } catch (reason) {
+                      setError(commandErrorMessage(reason));
+                    }
+                  }}
+                >
+                  查看诊断包内容
+                </Button>
+                <Button
+                  className="btn btn-accent"
+                  onPress={async () => {
+                    try {
+                      setDiagnosticPath(await quotaClient.exportDiagnostics());
+                    } catch (reason) {
+                      setError(commandErrorMessage(reason));
+                    }
+                  }}
+                >
+                  导出脱敏诊断包
+                </Button>
+              </div>
+            </div>
           </Section>
         </div>
       </div>
     </>
+  );
+}
+
+function NetworkProfilesEditor({
+  profiles,
+  onChange,
+  onError,
+}: {
+  profiles: NetworkProfileView[];
+  onChange: (profiles: NetworkProfileView[]) => void;
+  onError: (message: string | null) => void;
+}) {
+  const [selectedId, setSelectedId] = useState("");
+  const selected = profiles.find((profile) => profile.id === selectedId) ?? profiles[0];
+  const [label, setLabel] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [clearAuth, setClearAuth] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!selected) return;
+    setSelectedId(selected.id);
+    setLabel(selected.label);
+    setProxyUrl(selected.endpointLabel.replace(" · ", "://"));
+    setUsername("");
+    setPassword("");
+    setClearAuth(false);
+  }, [selected?.id]);
+
+  if (!selected) {
+    return (
+      <p className="px-4 py-4 text-[11.5px] text-ink-3">
+        尚未创建固定出口；添加账号时可新建 HTTP(S) 或 SOCKS5(H) 出口。
+      </p>
+    );
+  }
+
+  return (
+    <div className="px-4 py-3 flex flex-col gap-2.5">
+      <select
+        aria-label="选择固定出口"
+        value={selected.id}
+        onChange={(event) => setSelectedId(event.target.value)}
+        className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2 text-[12px] text-ink-1"
+      >
+        {profiles.map((profile) => (
+          <option key={profile.id} value={profile.id}>
+            {profile.label} · {profile.endpointLabel}
+          </option>
+        ))}
+      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          aria-label="固定出口标签"
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+          className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[rgba(127,141,168,0.06)] px-2.5 text-[12px] text-ink-1"
+        />
+        <input
+          aria-label="代理 URL"
+          value={proxyUrl}
+          onChange={(event) => setProxyUrl(event.target.value)}
+          className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[rgba(127,141,168,0.06)] px-2.5 text-[12px] text-ink-1"
+        />
+        <input
+          aria-label="新代理用户名"
+          placeholder={selected.hasAuth ? "用户名（留空则保留）" : "用户名（可选）"}
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[rgba(127,141,168,0.06)] px-2.5 text-[12px] text-ink-1"
+        />
+        <input
+          aria-label="新代理密码"
+          type="password"
+          placeholder={selected.hasAuth ? "密码（留空则保留）" : "密码（可选）"}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[rgba(127,141,168,0.06)] px-2.5 text-[12px] text-ink-1"
+        />
+      </div>
+      {selected.hasAuth && (
+        <label className="inline-flex items-center gap-2 text-[11.5px] text-ink-2">
+          <input
+            type="checkbox"
+            checked={clearAuth}
+            onChange={(event) => setClearAuth(event.target.checked)}
+          />
+          清除已保存的代理认证
+        </label>
+      )}
+      <p className="text-[11px] text-ink-3">
+        修改会影响所有复用此出口的凭据；现有认证默认保留，不从界面回显。
+      </p>
+      <div className="flex gap-2">
+        <Button
+          className="btn btn-accent"
+          isDisabled={busy || !label.trim() || !proxyUrl.trim()}
+          onPress={async () => {
+            setBusy(true);
+            onError(null);
+            try {
+              onChange(
+                await quotaClient.updateNetworkProfile({
+                  id: selected.id,
+                  label,
+                  proxyUrl,
+                  username: username.trim() || undefined,
+                  password: password || undefined,
+                  clearAuth,
+                }),
+              );
+            } catch (reason) {
+              onError(commandErrorMessage(reason));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          保存出口
+        </Button>
+        <Button
+          className="btn btn-outline"
+          isDisabled={busy}
+          onPress={async () => {
+            setBusy(true);
+            onError(null);
+            try {
+              const next = await quotaClient.deleteNetworkProfile(selected.id);
+              onChange(next);
+              setSelectedId(next[0]?.id ?? "");
+            } catch (reason) {
+              onError(commandErrorMessage(reason));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Trash2 size={13} />
+          删除未使用出口
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -320,6 +536,8 @@ function ThresholdField({
   tone: "warn" | "high" | "crit";
   onCommit: (value: number) => void;
 }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
   const color =
     tone === "warn" ? "var(--warn)" : tone === "high" ? "var(--high)" : "var(--crit)";
   return (
@@ -331,10 +549,18 @@ function ThresholdField({
       <div className="flex items-center gap-1">
         <input
           type="number"
-          value={value}
+          value={draft}
           min={0}
           max={100}
-          onChange={(event) => onCommit(Number(event.target.value))}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => {
+            const parsed = Number(draft);
+            if (Number.isFinite(parsed)) onCommit(parsed);
+            else setDraft(String(value));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
           className="tnum w-14 h-7 px-2 rounded-[var(--r-sm)] text-[13px] text-ink-1 bg-[rgba(127,141,168,0.06)] border border-[var(--line)] outline-none focus:border-[var(--accent)]"
         />
         <span className="text-[11px] text-ink-3">%</span>

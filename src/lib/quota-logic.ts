@@ -32,7 +32,9 @@ const TONE_RANK: Record<HealthTone, number> = {
 
 /** 账号健康 = 全部窗口中的最高档位；陈旧/错误状态直接标记 stale（§11.3 最危险优先） */
 export function toneForAccount(account: ServiceQuotaView): HealthTone {
-  if (account.state === "stale-with-error") return "stale";
+  if (account.state === "stale-with-error" || account.state === "paused") {
+    return "stale";
+  }
   return account.windows.reduce<HealthTone>((highest, window) => {
     const tone = toneForPercent(window.usedPercent);
     return TONE_RANK[tone] > TONE_RANK[highest] ? tone : highest;
@@ -44,7 +46,7 @@ export function highestWindow(accounts: ServiceQuotaView[]): {
   window: QuotaWindowView;
 } | null {
   const candidates = accounts
-    .filter((a) => a.state !== "stale-with-error")
+    .filter((a) => !["stale-with-error", "paused"].includes(a.state))
     .flatMap((account) =>
       account.windows.map((window) => ({ account, window })),
     );
@@ -57,7 +59,7 @@ export function highestWindow(accounts: ServiceQuotaView[]): {
 /** 需关注窗口数：达到 Warning 档及以上的窗口（不含陈旧账号） */
 export function attentionWindowCount(accounts: ServiceQuotaView[]): number {
   return accounts
-    .filter((a) => a.state !== "stale-with-error")
+    .filter((a) => !["stale-with-error", "paused"].includes(a.state))
     .flatMap((a) => a.windows)
     .filter((w) => w.usedPercent >= THRESHOLD_WARNING).length;
 }
@@ -65,7 +67,9 @@ export function attentionWindowCount(accounts: ServiceQuotaView[]): number {
 /** 健康账号数：无错误状态且最高窗口低于 Warning */
 export function healthyAccountCount(accounts: ServiceQuotaView[]): number {
   return accounts.filter(
-    (a) => a.state !== "stale-with-error" && toneForAccount(a) === "normal",
+    (a) =>
+      !["stale-with-error", "paused"].includes(a.state) &&
+      toneForAccount(a) === "normal",
   ).length;
 }
 

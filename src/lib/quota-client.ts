@@ -3,11 +3,13 @@ import { listen } from "@tauri-apps/api/event";
 import {
   phase0Connections,
   phase0Overview,
+  phase0ProviderHealth,
 } from "../data/phase0-fixtures";
 import type {
   AccountConnectionView,
   AppSettingsView,
   CredentialOptionView,
+  HistoryPointView,
   NetworkProfileView,
   OverviewView,
   ProviderKind,
@@ -44,6 +46,15 @@ export interface UpdateAccountInput {
   enabled: boolean;
 }
 
+export interface UpdateNetworkProfileInput {
+  id: string;
+  label: string;
+  proxyUrl: string;
+  username?: string;
+  password?: string;
+  clearAuth: boolean;
+}
+
 export interface CreateProviderAccountInput {
   provider: ProviderKind;
   accountLabel: string;
@@ -63,10 +74,17 @@ export interface QuotaClient {
   getOverview(): Promise<OverviewView>;
   getConnections(): Promise<AccountConnectionView[]>;
   getNetworkProfiles(): Promise<NetworkProfileView[]>;
+  updateNetworkProfile(input: UpdateNetworkProfileInput): Promise<NetworkProfileView[]>;
+  deleteNetworkProfile(id: string): Promise<NetworkProfileView[]>;
   getCredentials(): Promise<CredentialOptionView[]>;
   getSettings(): Promise<AppSettingsView>;
   updateSettings(input: AppSettingsView): Promise<AppSettingsView>;
   getProviderHealth(): Promise<import("./quota-types").ProviderHealthView[]>;
+  getHistory(days: 7 | 30 | 90): Promise<HistoryPointView[]>;
+  exportLatestSnapshot(): Promise<string>;
+  getDiagnosticManifest(): Promise<string[]>;
+  exportDiagnostics(): Promise<string>;
+  sendTestNotification(): Promise<void>;
   validateProvider(input: ValidateProviderInput): Promise<ProviderValidationView>;
   validateExistingCredential(
     credentialId: string,
@@ -75,13 +93,25 @@ export interface QuotaClient {
   createProviderAccount(input: CreateProviderAccountInput): Promise<AccountConnectionView[]>;
   updateCredential(input: UpdateCredentialInput): Promise<AccountConnectionView[]>;
   updateAccount(input: UpdateAccountInput): Promise<AccountConnectionView[]>;
+  deleteAccount(id: string): Promise<AccountConnectionView[]>;
   refreshAll(): Promise<OverviewView>;
   refreshAccount(id: string): Promise<OverviewView>;
   onOverviewUpdated(handler: (overview: OverviewView) => void): Promise<() => void>;
 }
 
 function cloneFixture(): OverviewView {
-  return structuredClone(phase0Overview);
+  const fixture = structuredClone(phase0Overview);
+  const requested = Number(new URLSearchParams(window.location.search).get("accounts"));
+  if (!Number.isInteger(requested) || requested <= fixture.accounts.length) return fixture;
+  fixture.accounts = Array.from({ length: Math.min(requested, 50) }, (_, index) => {
+    const source = fixture.accounts[index % fixture.accounts.length];
+    return {
+      ...structuredClone(source),
+      id: `scale-account-${index + 1}`,
+      accountLabel: `${source.accountLabel} ${index + 1}`,
+    };
+  });
+  return fixture;
 }
 
 class Phase0FixtureClient implements QuotaClient {
@@ -96,6 +126,14 @@ class Phase0FixtureClient implements QuotaClient {
   }
 
   async getNetworkProfiles(): Promise<NetworkProfileView[]> {
+    return [];
+  }
+
+  async updateNetworkProfile(_input: UpdateNetworkProfileInput): Promise<NetworkProfileView[]> {
+    return [];
+  }
+
+  async deleteNetworkProfile(_id: string): Promise<NetworkProfileView[]> {
     return [];
   }
 
@@ -134,9 +172,43 @@ class Phase0FixtureClient implements QuotaClient {
   }
 
   async getProviderHealth(): Promise<import("./quota-types").ProviderHealthView[]> {
-    const { phase0ProviderHealth } = await import("../data/phase0-fixtures");
     return structuredClone(phase0ProviderHealth);
   }
+
+  async getHistory(_days: 7 | 30 | 90): Promise<HistoryPointView[]> {
+    return phase0Overview.accounts.flatMap((account) =>
+      account.windows.flatMap((window) =>
+        Array.from({ length: 7 }, (_, index) => ({
+          accountId: account.id,
+          provider: account.provider,
+          accountLabel: account.accountLabel,
+          windowKind: window.kind,
+          windowLabel: window.label,
+          usedPercent: Math.max(0, window.usedPercent - (6 - index) * 2.5),
+          observedAt: new Date(Date.now() - (6 - index) * 86_400_000).toISOString(),
+        })),
+      ),
+    );
+  }
+
+  async exportLatestSnapshot(): Promise<string> {
+    return "浏览器预览不写入本机文件";
+  }
+
+  async getDiagnosticManifest(): Promise<string[]> {
+    return [
+      "manifest.json（应用版本、系统、数据库 schema）",
+      "provider-health.json（供应商健康）",
+      "settings.json（应用设置）",
+      "latest-snapshot.json（脱敏额度）",
+    ];
+  }
+
+  async exportDiagnostics(): Promise<string> {
+    return "浏览器预览不写入本机文件";
+  }
+
+  async sendTestNotification(): Promise<void> {}
 
   async validateProvider(
     input: ValidateProviderInput,
@@ -178,6 +250,10 @@ class Phase0FixtureClient implements QuotaClient {
     return structuredClone(phase0Connections);
   }
 
+  async deleteAccount(_id: string): Promise<AccountConnectionView[]> {
+    return structuredClone(phase0Connections);
+  }
+
   async refreshAll(): Promise<OverviewView> {
     await new Promise((resolve) => window.setTimeout(resolve, 640));
     return { ...cloneFixture(), refreshedAt: new Date().toISOString() };
@@ -210,6 +286,14 @@ class TauriQuotaClient implements QuotaClient {
     return invoke("get_network_profiles");
   }
 
+  updateNetworkProfile(input: UpdateNetworkProfileInput): Promise<NetworkProfileView[]> {
+    return invoke("update_network_profile", { input });
+  }
+
+  deleteNetworkProfile(id: string): Promise<NetworkProfileView[]> {
+    return invoke("delete_network_profile", { id });
+  }
+
   getCredentials(): Promise<CredentialOptionView[]> {
     return invoke("get_credentials");
   }
@@ -224,6 +308,26 @@ class TauriQuotaClient implements QuotaClient {
 
   getProviderHealth(): Promise<import("./quota-types").ProviderHealthView[]> {
     return invoke("get_provider_health");
+  }
+
+  getHistory(days: 7 | 30 | 90): Promise<HistoryPointView[]> {
+    return invoke("get_history", { days });
+  }
+
+  exportLatestSnapshot(): Promise<string> {
+    return invoke("export_latest_snapshot");
+  }
+
+  getDiagnosticManifest(): Promise<string[]> {
+    return invoke("get_diagnostic_manifest");
+  }
+
+  exportDiagnostics(): Promise<string> {
+    return invoke("export_diagnostics");
+  }
+
+  sendTestNotification(): Promise<void> {
+    return invoke("send_test_notification");
   }
 
   validateProvider(input: ValidateProviderInput): Promise<ProviderValidationView> {
@@ -249,6 +353,10 @@ class TauriQuotaClient implements QuotaClient {
 
   updateAccount(input: UpdateAccountInput): Promise<AccountConnectionView[]> {
     return invoke("update_account", { input });
+  }
+
+  deleteAccount(id: string): Promise<AccountConnectionView[]> {
+    return invoke("delete_account", { id });
   }
 
   refreshAll(): Promise<OverviewView> {

@@ -14,8 +14,9 @@ use sqlx::{
 
 use crate::{
     domain::{
-        AccountConnectionView, AppSettingsView, CredentialOptionView, NetworkProfileView,
-        OverviewView, ProviderHealthView, QuotaWindowView, ServiceQuotaView, UpdateSettingsInput,
+        AccountConnectionView, AppSettingsView, CredentialOptionView, HistoryPointView,
+        NetworkProfileView, OverviewView, ProviderHealthView, QuotaWindowView, ServiceQuotaView,
+        UpdateSettingsInput,
     },
     error::CommandError,
     network::NewNetworkProfile,
@@ -137,6 +138,17 @@ pub struct AppSettingsRecord {
     pub notify_auth: bool,
     pub notify_stale: bool,
     pub notify_recovery: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct AlertEvent {
+    pub title: String,
+    pub body: String,
+}
+
+#[derive(Debug)]
+pub struct DeleteAccountOutcome {
+    pub credential_id: Option<String>,
 }
 
 pub async fn open(path: &Path) -> Result<SqlitePool, Box<dyn std::error::Error>> {
@@ -600,7 +612,14 @@ pub async fn overview(pool: &SqlitePool) -> Result<OverviewView, CommandError> {
             provider: row.provider,
             account_label: row.label,
             plan: row.plan,
-            state: if stale { "stale-with-error" } else { "ready" }.into(),
+            state: if !row.enabled {
+                "paused"
+            } else if stale {
+                "stale-with-error"
+            } else {
+                "ready"
+            }
+            .into(),
             freshness: if stale { "stale" } else { "fresh" }.into(),
             last_success_at: row.last_success_at,
             error_category: row.last_error_category,
@@ -638,7 +657,14 @@ pub async fn connections(pool: &SqlitePool) -> Result<Vec<AccountConnectionView>
                 .network_profile_label
                 .map(|label| format!("固定出口 · {label}"))
                 .unwrap_or_else(|| "默认网络栈 / TUN".into()),
-            state: if stale { "stale-with-error" } else { "ready" }.into(),
+            state: if !row.enabled {
+                "paused"
+            } else if stale {
+                "stale-with-error"
+            } else {
+                "ready"
+            }
+            .into(),
             freshness: if stale { "stale" } else { "fresh" }.into(),
             last_success_at: row.last_success_at,
             next_refresh_at: row.next_refresh_at,
@@ -740,6 +766,59 @@ pub async fn network_profiles(pool: &SqlitePool) -> Result<Vec<NetworkProfileVie
             has_auth: row.has_auth,
         })
         .collect())
+}
+
+pub async fn network_profile_usage(pool: &SqlitePool, id: &str) -> Result<i64, CommandError> {
+    sqlx::query_scalar("SELECT COUNT(*) FROM credentials WHERE network_profile_id = ?")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .map_err(|_| CommandError::storage("无法读取固定出口引用"))
+}
+
+pub async fn update_network_profile(
+    pool: &SqlitePool,
+    profile: &NewNetworkProfile,
+) -> Result<(), CommandError> {
+    let result = sqlx::query(
+        "UPDATE network_profiles
+         SET label = ?, transport = ?, host = ?, port = ?, has_auth = ?
+         WHERE id = ?",
+    )
+    .bind(&profile.label)
+    .bind(&profile.transport)
+    .bind(&profile.host)
+    .bind(i64::from(profile.port))
+    .bind(profile.has_auth)
+    .bind(&profile.id)
+    .execute(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法更新固定出口"))?;
+    if result.rows_affected() == 0 {
+        return Err(CommandError::validation("固定出口不存在"));
+    }
+    Ok(())
+}
+
+pub async fn delete_network_profile(pool: &SqlitePool, id: &str) -> Result<bool, CommandError> {
+    if network_profile_usage(pool, id).await? > 0 {
+        return Err(CommandError::validation("该固定出口仍被凭据使用，不能删除"));
+    }
+    let has_auth: Option<bool> =
+        sqlx::query_scalar("SELECT has_auth FROM network_profiles WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|_| CommandError::storage("无法读取固定出口"))?;
+    let Some(has_auth) = has_auth else {
+        return Err(CommandError::validation("固定出口不存在"));
+    };
+    sqlx::query("DELETE FROM network_profiles WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|_| CommandError::storage("无法删除固定出口"))?;
+    Ok(has_auth)
 }
 
 pub async fn credential_options(
@@ -866,6 +945,50 @@ pub async fn update_account(
         return Err(CommandError::validation("账号不存在"));
     }
     Ok(())
+}
+
+pub async fn delete_account(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<DeleteAccountOutcome, CommandError> {
+    let credential_id: String =
+        sqlx::query_scalar("SELECT credential_id FROM provider_accounts WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|_| CommandError::storage("无法读取待删除账号"))?
+            .ok_or_else(|| CommandError::validation("账号不存在"))?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|_| CommandError::storage("无法开始删除账号事务"))?;
+    sqlx::query("DELETE FROM provider_accounts WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| CommandError::storage("无法删除本地账号"))?;
+    let remaining: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM provider_accounts WHERE credential_id = ?")
+            .bind(&credential_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|_| CommandError::storage("无法检查凭据引用"))?;
+    let deleted_credential = if remaining == 0 {
+        sqlx::query("DELETE FROM credentials WHERE id = ?")
+            .bind(&credential_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| CommandError::storage("无法删除凭据元数据"))?;
+        Some(credential_id)
+    } else {
+        None
+    };
+    tx.commit()
+        .await
+        .map_err(|_| CommandError::storage("无法提交删除账号事务"))?;
+    Ok(DeleteAccountOutcome {
+        credential_id: deleted_credential,
+    })
 }
 
 pub async fn network_profile_by_id(
@@ -1042,6 +1165,259 @@ pub async fn provider_health(pool: &SqlitePool) -> Result<Vec<ProviderHealthView
             consecutive_failures: row.consecutive_failures,
         })
         .collect())
+}
+
+pub async fn history(pool: &SqlitePool, days: i64) -> Result<Vec<HistoryPointView>, CommandError> {
+    if !matches!(days, 7 | 30 | 90) {
+        return Err(CommandError::validation("历史范围只能是 7、30 或 90 天"));
+    }
+    #[derive(FromRow)]
+    struct Row {
+        account_id: String,
+        provider: String,
+        account_label: String,
+        window_kind: String,
+        window_label: String,
+        used_percent: f64,
+        observed_at: String,
+    }
+    let cutoff = (Utc::now() - ChronoDuration::days(days)).to_rfc3339();
+    let rows = sqlx::query_as::<_, Row>(
+        "SELECT h.account_id, a.provider, a.label AS account_label,
+                h.window_kind, h.window_label, h.used_percent, h.observed_at
+         FROM quota_history h
+         JOIN provider_accounts a ON a.id = h.account_id
+         WHERE h.observed_at >= ?
+         ORDER BY h.observed_at ASC",
+    )
+    .bind(cutoff)
+    .fetch_all(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法读取额度历史"))?;
+    Ok(rows
+        .into_iter()
+        .map(|row| HistoryPointView {
+            account_id: row.account_id,
+            provider: row.provider,
+            account_label: row.account_label,
+            window_kind: row.window_kind,
+            window_label: row.window_label,
+            used_percent: row.used_percent,
+            observed_at: row.observed_at,
+        })
+        .collect())
+}
+
+pub async fn evaluate_quota_alerts(
+    pool: &SqlitePool,
+    account_id: &str,
+    windows: &[QuotaWindowView],
+) -> Result<Vec<AlertEvent>, CommandError> {
+    let settings = settings_record(pool).await?;
+    let (provider, account_label): (String, String) =
+        sqlx::query_as("SELECT provider, label FROM provider_accounts WHERE id = ?")
+            .bind(account_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|_| CommandError::storage("无法读取告警账号"))?;
+    let now = Utc::now().to_rfc3339();
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|_| CommandError::storage("无法开始告警状态事务"))?;
+    let mut events = Vec::new();
+    for window in windows {
+        let key = format!("quota:{}", window.kind);
+        let period_key = window.resets_at.as_deref().unwrap_or("unknown");
+        let existing: Option<(String, Option<String>, i64, Option<String>)> = sqlx::query_as(
+            "SELECT state, period_key, generation, last_notified_at
+             FROM alert_states WHERE account_id = ? AND alert_key = ?",
+        )
+        .bind(account_id)
+        .bind(&key)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|_| CommandError::storage("无法读取额度告警状态"))?;
+        let (mut previous, previous_period, mut generation, previous_notified) =
+            existing.unwrap_or_else(|| ("normal".into(), None, 0, None));
+        if previous_period.as_deref() != Some(period_key) {
+            previous = "normal".into();
+            generation += 1;
+        }
+        let previous_rank = alert_rank(&previous);
+        let computed = quota_alert_state(window.used_percent, &settings);
+        let next = if computed == "normal"
+            && previous_rank > 0
+            && window.used_percent >= settings.warning_threshold - 5.0
+        {
+            previous.as_str()
+        } else {
+            computed
+        };
+        let next_rank = alert_rank(next);
+        let should_notify = next_rank > previous_rank
+            || (previous_rank > 0 && next_rank == 0 && settings.notify_recovery);
+        if should_notify {
+            let title = if next_rank == 0 {
+                "额度状态已恢复".to_string()
+            } else {
+                format!("额度 {}", alert_state_label(next))
+            };
+            let body = if next_rank == 0 {
+                format!(
+                    "{} · {} 的{}已回落至 {:.1}%",
+                    provider_name(&provider),
+                    account_label,
+                    window.label,
+                    window.used_percent
+                )
+            } else {
+                format!(
+                    "{} · {} 的{}已使用 {:.1}%",
+                    provider_name(&provider),
+                    account_label,
+                    window.label,
+                    window.used_percent
+                )
+            };
+            events.push(AlertEvent { title, body });
+        }
+        let notified_at = if should_notify {
+            Some(now.clone())
+        } else {
+            previous_notified
+        };
+        sqlx::query(
+            "INSERT INTO alert_states
+             (account_id, alert_key, period_key, generation, state,
+              last_notified_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(account_id, alert_key) DO UPDATE SET
+               period_key = excluded.period_key,
+               generation = excluded.generation,
+               state = excluded.state,
+               last_notified_at = excluded.last_notified_at,
+               updated_at = excluded.updated_at",
+        )
+        .bind(account_id)
+        .bind(&key)
+        .bind(period_key)
+        .bind(generation)
+        .bind(next)
+        .bind(notified_at)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| CommandError::storage("无法保存额度告警状态"))?;
+    }
+    tx.commit()
+        .await
+        .map_err(|_| CommandError::storage("无法提交额度告警状态"))?;
+    Ok(events)
+}
+
+pub async fn evaluate_health_alert(
+    pool: &SqlitePool,
+    account_id: &str,
+    next_state: &str,
+) -> Result<Vec<AlertEvent>, CommandError> {
+    let settings = settings_record(pool).await?;
+    let (provider, account_label): (String, String) =
+        sqlx::query_as("SELECT provider, label FROM provider_accounts WHERE id = ?")
+            .bind(account_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|_| CommandError::storage("无法读取健康告警账号"))?;
+    let existing: Option<(String, i64, Option<String>)> = sqlx::query_as(
+        "SELECT state, generation, last_notified_at
+         FROM alert_states WHERE account_id = ? AND alert_key = 'health'",
+    )
+    .bind(account_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法读取健康告警状态"))?;
+    let (previous, generation, previous_notified) =
+        existing.unwrap_or_else(|| ("normal".into(), 0, None));
+    let changed = previous != next_state;
+    let should_notify = changed
+        && match next_state {
+            "normal" => previous != "normal" && settings.notify_recovery,
+            "auth" => settings.notify_auth,
+            _ => settings.notify_stale,
+        };
+    let now = Utc::now().to_rfc3339();
+    let notified_at = if should_notify {
+        Some(now.clone())
+    } else {
+        previous_notified
+    };
+    sqlx::query(
+        "INSERT INTO alert_states
+         (account_id, alert_key, period_key, generation, state,
+          last_notified_at, updated_at)
+         VALUES (?, 'health', NULL, ?, ?, ?, ?)
+         ON CONFLICT(account_id, alert_key) DO UPDATE SET
+           generation = excluded.generation,
+           state = excluded.state,
+           last_notified_at = excluded.last_notified_at,
+           updated_at = excluded.updated_at",
+    )
+    .bind(account_id)
+    .bind(if previous == "normal" && next_state != "normal" {
+        generation + 1
+    } else {
+        generation
+    })
+    .bind(next_state)
+    .bind(notified_at)
+    .bind(&now)
+    .execute(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法保存健康告警状态"))?;
+    if !should_notify {
+        return Ok(Vec::new());
+    }
+    let title = match next_state {
+        "normal" => "额度监控已恢复",
+        "auth" => "需要更新凭据",
+        "parser" => "供应商页面结构已变化",
+        "proxy" => "固定出口不可用",
+        _ => "额度数据已陈旧",
+    };
+    Ok(vec![AlertEvent {
+        title: title.into(),
+        body: format!("{} · {}", provider_name(&provider), account_label),
+    }])
+}
+
+fn quota_alert_state(used_percent: f64, settings: &AppSettingsRecord) -> &'static str {
+    if used_percent >= settings.critical_threshold {
+        "critical"
+    } else if used_percent >= settings.high_threshold {
+        "high"
+    } else if used_percent >= settings.warning_threshold {
+        "warning"
+    } else {
+        "normal"
+    }
+}
+
+fn alert_rank(state: &str) -> u8 {
+    match state {
+        "warning" => 1,
+        "high" => 2,
+        "critical" => 3,
+        _ => 0,
+    }
+}
+
+fn alert_state_label(state: &str) -> &str {
+    match state {
+        "warning" => "Warning",
+        "high" => "High",
+        "critical" => "Critical",
+        _ => "恢复",
+    }
 }
 
 fn effective_interval(
@@ -1432,5 +1808,128 @@ mod tests {
             credential_options(&pool).await.unwrap()[0].shared_account_count,
             2
         );
+    }
+
+    #[tokio::test]
+    async fn deduplicates_and_rearms_quota_and_health_alerts() {
+        let pool = seeded_pool("clinepass").await;
+        let warning = quota_window(72.0);
+        assert_eq!(
+            evaluate_quota_alerts(&pool, "account-test", std::slice::from_ref(&warning))
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(evaluate_quota_alerts(&pool, "account-test", &[warning])
+            .await
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            evaluate_quota_alerts(&pool, "account-test", &[quota_window(87.0)])
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            evaluate_quota_alerts(&pool, "account-test", &[quota_window(64.0)])
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            evaluate_quota_alerts(&pool, "account-test", &[quota_window(72.0)])
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            evaluate_health_alert(&pool, "account-test", "auth")
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(evaluate_health_alert(&pool, "account-test", "auth")
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn deletes_last_credential_only_after_all_shared_accounts_are_removed() {
+        let pool = seeded_pool("opencode-go").await;
+        insert_accounts_for_credential(
+            &pool,
+            "credential-test",
+            "opencode-go",
+            &[NewAccountRecord {
+                id: "account-second".into(),
+                label: "第二工作区".into(),
+                scope_id: Some("workspace-b".into()),
+                plan: None,
+                windows: vec![quota_window(20.0)],
+            }],
+        )
+        .await
+        .unwrap();
+        let first = delete_account(&pool, "account-test").await.unwrap();
+        assert!(first.credential_id.is_none());
+        let credential_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM credentials")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(credential_count, 1);
+        let second = delete_account(&pool, "account-second").await.unwrap();
+        assert_eq!(second.credential_id.as_deref(), Some("credential-test"));
+        let credential_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM credentials")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(credential_count, 0);
+    }
+
+    #[tokio::test]
+    async fn supports_five_accounts_for_each_provider_in_one_overview() {
+        let directory = tempfile::tempdir().unwrap();
+        let pool = open(&directory.path().join("scale.sqlite3")).await.unwrap();
+        for provider in ["clinepass", "opencode-go", "ollama-cloud"] {
+            for index in 0..5 {
+                let credential_id = format!("{provider}-credential-{index}");
+                let account_id = format!("{provider}-account-{index}");
+                insert_provider_bundle(
+                    &pool,
+                    provider,
+                    &credential_id,
+                    &format!("{provider} 凭据 {index}"),
+                    None,
+                    None,
+                    &[NewAccountRecord {
+                        id: account_id,
+                        label: format!("{provider} 账号 {index}"),
+                        scope_id: (provider == "opencode-go").then(|| format!("workspace-{index}")),
+                        plan: None,
+                        windows: vec![quota_window(10.0 + f64::from(index))],
+                    }],
+                )
+                .await
+                .unwrap();
+            }
+        }
+        let overview = overview(&pool).await.unwrap();
+        assert_eq!(overview.accounts.len(), 15);
+        for provider in ["clinepass", "opencode-go", "ollama-cloud"] {
+            assert_eq!(
+                overview
+                    .accounts
+                    .iter()
+                    .filter(|account| account.provider == provider)
+                    .count(),
+                5
+            );
+        }
     }
 }
