@@ -17,7 +17,7 @@ export function QuotaWindowRow({
   const countdown = formatResetCountdown(window.resetsAt, now);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="quota-window-row flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[12.5px] text-ink-2">{window.label}</span>
         <span className="flex items-baseline gap-1.5">
