@@ -76,11 +76,18 @@ pub async fn create_provider_account(
     state: State<'_, AppState>,
     input: CreateProviderAccountInput,
 ) -> Result<Vec<AccountConnectionView>, CommandError> {
+    create_provider_account_core(&state.db, input).await
+}
+
+pub(crate) async fn create_provider_account_core(
+    db: &SqlitePool,
+    input: CreateProviderAccountInput,
+) -> Result<Vec<AccountConnectionView>, CommandError> {
     validate_provider_name(&input.provider)?;
     let account_label = validated_label(input.account_label, "账号标签")?;
     let credential_label = validated_label(input.credential_label, "凭据标签")?;
     let secret = validated_secret(input.secret)?;
-    let route = resolve_route(&state.db, input.route).await?;
+    let route = resolve_route(db, input.route).await?;
     let payload = fetch_provider(
         &input.provider,
         &route.client,
@@ -104,7 +111,7 @@ pub async fn create_provider_account(
     }
 
     let inserted = storage::insert_provider_bundle(
-        &state.db,
+        db,
         &input.provider,
         &credential_id,
         &credential_label,
@@ -122,7 +129,7 @@ pub async fn create_provider_account(
         }
         return Err(error);
     }
-    storage::connections(&state.db).await
+    storage::connections(db).await
 }
 
 #[tauri::command]

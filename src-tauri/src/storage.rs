@@ -422,6 +422,15 @@ pub async fn network_profile_by_id(
     .ok_or_else(|| CommandError::validation("所选固定出口不存在"))
 }
 
+pub async fn credential_label_exists(pool: &SqlitePool, label: &str) -> Result<bool, CommandError> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM credentials WHERE label = ?")
+        .bind(label)
+        .fetch_one(pool)
+        .await
+        .map_err(|_| CommandError::storage("无法检查已导入凭据"))?;
+    Ok(count > 0)
+}
+
 fn provider_name(provider: &str) -> &str {
     match provider {
         "clinepass" => "Cline Pass",
