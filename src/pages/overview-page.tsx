@@ -1,8 +1,7 @@
 import { ArrowDownWideNarrow, Plus, RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useEffect, useMemo, useState } from "react";
-import { phase0Connections } from "../data/phase0-fixtures";
-import { quotaClient } from "../lib/quota-client";
+import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { sortByRisk } from "../lib/quota-logic";
 import type { PageId, ServiceQuotaView } from "../lib/quota-types";
 import { PageHeader } from "../components/shell/app-shell";
@@ -10,6 +9,7 @@ import { SegmentedControl } from "../components/ui/segmented";
 import { SkeletonCard } from "../components/ui/skeleton";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
 import { SummaryStrip } from "../components/quota/summary-strip";
+import { StableSurface } from "../components/ui/surface";
 
 type Filter = "all" | "attention" | "stale";
 
@@ -20,18 +20,26 @@ export function OverviewPage({
 }) {
   const [accounts, setAccounts] = useState<ServiceQuotaView[] | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
+  const [source, setSource] = useState<"phase0-fixture" | "tauri">("phase0-fixture");
   const [refreshing, setRefreshing] = useState(false);
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // 首屏一次性加载（静态阶段；接入 Tauri 后由 TanStack Query 承载）
   useEffect(() => {
     let cancelled = false;
-    void quotaClient.getOverview().then((data) => {
-      if (cancelled) return;
-      setAccounts(data.accounts);
-      setRefreshedAt(data.refreshedAt);
-    });
+    void quotaClient
+      .getOverview()
+      .then((data) => {
+        if (cancelled) return;
+        setAccounts(data.accounts);
+        setRefreshedAt(data.refreshedAt);
+        setSource(data.source);
+      })
+      .catch((reason) => {
+        if (!cancelled) setLoadError(commandErrorMessage(reason));
+      });
     return () => {
       cancelled = true;
     };
@@ -49,10 +57,14 @@ export function OverviewPage({
 
   async function refreshAll() {
     setRefreshing(true);
+    setLoadError(null);
     try {
       const data = await quotaClient.refreshAll();
       setAccounts(data.accounts);
       setRefreshedAt(data.refreshedAt);
+      setSource(data.source);
+    } catch (reason) {
+      setLoadError(commandErrorMessage(reason));
     } finally {
       setRefreshing(false);
     }
@@ -60,10 +72,14 @@ export function OverviewPage({
 
   async function refreshAccount(id: string) {
     setCardRefreshing(id);
+    setLoadError(null);
     try {
       const data = await quotaClient.refreshAccount(id);
       setAccounts(data.accounts);
       setRefreshedAt(data.refreshedAt);
+      setSource(data.source);
+    } catch (reason) {
+      setLoadError(commandErrorMessage(reason));
     } finally {
       setCardRefreshing(null);
     }
@@ -94,21 +110,27 @@ export function OverviewPage({
       />
 
       <div className="page-scroll overview-page flex-1 overflow-y-auto px-7 py-5">
+        {loadError && (
+          <StableSurface className="mb-4 px-4 py-3">
+            <p className="text-[12.5px] text-ink-2">额度数据读取失败</p>
+            <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
+          </StableSurface>
+        )}
         {accounts && (
           <div className="mb-5">
             <SummaryStrip accounts={accounts} refreshedAt={refreshedAt} />
           </div>
         )}
 
-        {!accounts ? (
+        {!accounts && !loadError ? (
           <Grid>
             {Array.from({ length: 4 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </Grid>
-        ) : visible.length === 0 ? (
+        ) : accounts && visible.length === 0 ? (
           <EmptyOverview onPageChange={onPageChange} />
-        ) : (
+        ) : accounts ? (
           <Grid>
             {visible.map((account) => (
               <ServiceQuotaCard
@@ -120,11 +142,11 @@ export function OverviewPage({
               />
             ))}
           </Grid>
-        )}
+        ) : null}
 
         <div className="data-provenance mt-5 text-[11px] text-ink-3">
-          已连接 {phase0Connections.filter((c) => c.enabled).length}/
-          {phase0Connections.length} 个账号 · 数据来源：Phase 0 脱敏样本
+          已连接 {accounts?.length ?? 0} 个账号 · 数据来源：
+          {source === "tauri" ? "本机实时 Core" : "Phase 0 脱敏样本"}
         </div>
       </div>
     </>

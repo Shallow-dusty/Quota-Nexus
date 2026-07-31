@@ -36,11 +36,17 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 
 当前状态：Phase 0 已完成。三个只读探针均已通过真实账号验证，匿名鉴权行为、显式代理
 失败不回退、默认 TUN 路由和脱敏证据均已验证（见 `docs/provider-contracts/`）。
-Phase 1 前端静态矩阵已完成第二版视觉重构：React 前端可在普通浏览器独立预览，Tauri
-负责正式桌面交付；额度卡、表格和表单使用稳定内容面，侧栏、工具按钮、分段选择器和
-Dialog 使用 SVG 位移折射与 backdrop blur 组成的控制玻璃。Overview/Accounts/Settings
-三页、五种数据状态与添加账号分步 Dialog 均已覆盖。当前由 Phase 0 脱敏样本驱动，
-`pnpm visual:check` 会覆盖浅/深色、640/960/1440 宽度、三页与 Dialog，并对空白截图及浏览器告警失败；
-下一步接入 Tauri Core、Windows Credential Manager 与 ClinePass 实时刷新，完成首个
-前后端纵向切片。
+Phase 1 的前端静态矩阵和第一条 ClinePass 纵向链路已经落地：React 可在普通浏览器用
+Phase 0 脱敏样本独立预览；Tauri 桌面运行时则使用 Rust Core、SQLite migration 和
+Windows Credential Manager，支持添加 ClinePass 账号、真实连接验证、额度 DTO、账号列表
+及全局/单账号手动刷新。`pnpm desktop:build` 已生成并启动验证 Windows EXE；Rust 自动测试
+覆盖 ClinePass 合同、SQLite 配置/读写和 WCM 临时凭据写入/读取/删除。尚待用户在桌面端
+录入一个真实 ClinePass API Key，完成 UI 端到端验收；随后接入 NetworkProfile 固定出口、
+OpenCode Go 与 Ollama Cloud。
+
+常用命令：
+
+- `pnpm dev`：浏览器预览（Phase 0 脱敏样本）。
+- `pnpm desktop:dev`：启动 Tauri 桌面开发版。
+- `pnpm desktop:build`：生成 Windows release EXE。
 已结束的评审记录保存在 `docs/archive/`（[历程索引](docs/archive/README.md)），日常开发无需读取。

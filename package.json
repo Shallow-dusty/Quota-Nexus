@@ -6,12 +6,16 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
+    "tauri": "tauri",
+    "desktop:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tauri-windows.ps1 dev",
+    "desktop:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tauri-windows.ps1 build",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "visual:check": "node scripts/visual-check.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.101.4",
+    "@tauri-apps/api": "^2.11.1",
     "lucide-react": "1.28.0",
     "react": "19.2.8",
     "react-aria-components": "1.19.0",
@@ -19,6 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "24.10.4",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",

@@ -10,6 +10,10 @@ output/
 # Rust / Tauri
 target/
 src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/icon.icns
 
 # Local runtime data
 data/

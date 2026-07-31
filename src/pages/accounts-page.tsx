@@ -1,9 +1,8 @@
 import { Check, Plus } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useState } from "react";
-import {
-  phase0Connections,
-} from "../data/phase0-fixtures";
+import { useEffect } from "react";
+import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { formatDateTime, formatRelativePast } from "../lib/format";
 import { toneForAccount } from "../lib/quota-logic";
 import type { AccountConnectionView, ProviderKind } from "../lib/quota-types";
@@ -17,6 +16,23 @@ import { AddAccountDialog } from "../components/quota/add-account-dialog";
 export function AccountsPage() {
   const now = useNow();
   const [open, setOpen] = useState(false);
+  const [connections, setConnections] = useState<AccountConnectionView[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void quotaClient
+      .getConnections()
+      .then((data) => {
+        if (!cancelled) setConnections(data);
+      })
+      .catch((reason) => {
+        if (!cancelled) setLoadError(commandErrorMessage(reason));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -33,13 +49,31 @@ export function AccountsPage() {
 
       <div className="page-scroll accounts-page flex-1 overflow-y-auto px-7 py-5">
         <div className="connections-list flex flex-col gap-3">
-          {phase0Connections.map((c) => (
+          {loadError && (
+            <StableSurface className="px-6 py-8 text-center">
+              <p className="text-[13px] text-ink-2">账号列表读取失败</p>
+              <p className="mt-1 text-[11.5px] text-ink-3">{loadError}</p>
+            </StableSurface>
+          )}
+          {(connections ?? []).map((c) => (
             <ConnectionRow key={c.id} connection={c} now={now} />
           ))}
+          {connections?.length === 0 && (
+            <StableSurface className="px-6 py-10 text-center">
+              <p className="text-[13px] text-ink-2">还没有本地账号</p>
+              <p className="mt-1 text-[11.5px] text-ink-3">
+                添加一个 Cline Pass 账号，完成第一条实时额度链路
+              </p>
+            </StableSurface>
+          )}
         </div>
       </div>
 
-      <AddAccountDialog open={open} onClose={() => setOpen(false)} />
+      <AddAccountDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onSaved={setConnections}
+      />
     </>
   );
 }

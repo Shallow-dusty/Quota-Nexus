@@ -1,6 +1,12 @@
 import { ArrowLeft, ArrowRight, Check, Globe, KeyRound } from "lucide-react";
 import { Button, Dialog, DialogTrigger, Modal, ModalOverlay } from "react-aria-components";
 import { useState } from "react";
+import {
+  commandErrorMessage,
+  isTauriRuntime,
+  quotaClient,
+} from "../../lib/quota-client";
+import type { AccountConnectionView } from "../../lib/quota-types";
 import type { ProviderKind } from "../../lib/quota-types";
 import { FloatingGlass } from "../ui/surface";
 import { ProviderMark } from "./provider-mark";
@@ -14,9 +20,11 @@ const PROVIDERS: Array<{ id: ProviderKind; name: string; hint: string }> = [
 export function AddAccountDialog({
   open,
   onClose,
+  onSaved,
 }: {
   open: boolean;
   onClose: () => void;
+  onSaved?: (connections: AccountConnectionView[]) => void;
 }) {
   const [step, setStep] = useState(0);
   const [provider, setProvider] = useState<ProviderKind | null>(null);
@@ -24,8 +32,12 @@ export function AddAccountDialog({
   const [route, setRoute] = useState<"default" | "existing" | "new">("default");
   const [label, setLabel] = useState("");
   const [scope, setScope] = useState("");
+  const [credentialLabel, setCredentialLabel] = useState("");
+  const [secret, setSecret] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setStep(0);
@@ -34,8 +46,12 @@ export function AddAccountDialog({
     setRoute("default");
     setLabel("");
     setScope("");
+    setCredentialLabel("");
+    setSecret("");
     setVerifying(false);
     setVerified(false);
+    setSaving(false);
+    setError(null);
   }
 
   function close() {
@@ -90,7 +106,12 @@ export function AddAccountDialog({
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => setProvider(p.id)}
+                        onClick={() => {
+                          setProvider(p.id);
+                          setVerified(false);
+                          setError(null);
+                        }}
+                        disabled={isTauriRuntime && p.id !== "clinepass"}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-md)] text-left transition-colors"
                         style={{
                           border: "1px solid var(--line)",
@@ -98,12 +119,19 @@ export function AddAccountDialog({
                             provider === p.id ? "var(--accent-soft)" : "transparent",
                           borderColor:
                             provider === p.id ? "var(--accent)" : "var(--line)",
+                          opacity:
+                            isTauriRuntime && p.id !== "clinepass" ? 0.52 : 1,
                         }}
                       >
                         <ProviderMark provider={p.id} />
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] font-medium text-ink-1">{p.name}</div>
-                          <div className="text-[11.5px] text-ink-3">{p.hint}</div>
+                          <div className="text-[11.5px] text-ink-3">
+                            {p.hint}
+                            {isTauriRuntime && p.id !== "clinepass"
+                              ? " · 下一切片接入"
+                              : ""}
+                          </div>
                         </div>
                         {provider === p.id && (
                           <Check size={16} className="text-accent" />
@@ -120,19 +148,36 @@ export function AddAccountDialog({
                         value={credentialSource}
                         onChange={setCredentialSource}
                         options={[
-                          { id: "existing", label: "使用已有凭据" },
+                          {
+                            id: "existing",
+                            label: "使用已有凭据（下一切片）",
+                            disabled: true,
+                          },
                           { id: "new", label: "新建凭据（填写标签与秘密）" },
                         ]}
                       />
                       {credentialSource === "new" && (
                         <div className="flex flex-col gap-2 mt-2">
-                          <TextInput placeholder="凭据标签，如 OpenCode · 主 Cookie" />
+                          <TextInput
+                            placeholder="凭据标签，如 Cline Pass · 主 Key"
+                            value={credentialLabel}
+                            onChange={(event) => {
+                              setCredentialLabel(event.target.value);
+                              setVerified(false);
+                            }}
+                          />
                           <TextAreaInput
                             placeholder={
                               provider === "clinepass"
                                 ? "粘贴 ClinePass API Key"
                                 : "粘贴完整 Cookie 请求头"
                             }
+                            value={secret}
+                            onChange={(event) => {
+                              setSecret(event.target.value);
+                              setVerified(false);
+                              setError(null);
+                            }}
                           />
                           <p className="text-[11px] text-ink-3 flex items-center gap-1">
                             <KeyRound size={11} />
@@ -145,11 +190,22 @@ export function AddAccountDialog({
                     <Field label="网络出口">
                       <RadioGroup
                         value={route}
-                        onChange={setRoute}
+                        onChange={(next) => {
+                          setRoute(next);
+                          setVerified(false);
+                        }}
                         options={[
                           { id: "default", label: "默认网络栈（当前 TUN/系统）" },
-                          { id: "existing", label: "已有固定出口" },
-                          { id: "new", label: "新建固定代理（scheme/host/port）" },
+                          {
+                            id: "existing",
+                            label: "已有固定出口（下一切片）",
+                            disabled: true,
+                          },
+                          {
+                            id: "new",
+                            label: "新建固定代理（下一切片）",
+                            disabled: true,
+                          },
                         ]}
                       />
                       {route === "new" && (
@@ -192,11 +248,25 @@ export function AddAccountDialog({
                         className="btn btn-accent"
                         onPress={async () => {
                           setVerifying(true);
-                          await new Promise((r) => setTimeout(r, 700));
-                          setVerifying(false);
-                          setVerified(true);
+                          setError(null);
+                          try {
+                            await quotaClient.validateClinePass({ apiKey: secret });
+                            setVerified(true);
+                          } catch (reason) {
+                            setVerified(false);
+                            setError(commandErrorMessage(reason));
+                          } finally {
+                            setVerifying(false);
+                          }
                         }}
-                        isDisabled={verifying || verified}
+                        isDisabled={
+                          verifying ||
+                          verified ||
+                          provider !== "clinepass" ||
+                          credentialSource !== "new" ||
+                          route !== "default" ||
+                          !secret.trim()
+                        }
                       >
                         {verified ? (
                           <><Check size={14} /> 验证通过</>
@@ -209,6 +279,11 @@ export function AddAccountDialog({
                           ? "凭据可用，可保存账号"
                           : "验证只读额度接口，不消耗模型额度"}
                       </p>
+                      {error && (
+                        <p className="text-[11px] text-[var(--danger)] mt-2">
+                          {error}
+                        </p>
+                      )}
                     </Field>
                   </div>
                 )}
@@ -226,14 +301,45 @@ export function AddAccountDialog({
                 <Button
                   className="btn btn-accent"
                   isDisabled={
-                    (step === 0 && !provider) || (step === 2 && !verified)
+                    saving ||
+                    (step === 0 && !provider) ||
+                    (step === 1 &&
+                      (credentialSource !== "new" ||
+                        route !== "default" ||
+                        !credentialLabel.trim() ||
+                        !secret.trim())) ||
+                    (step === 2 && (!verified || !label.trim()))
                   }
-                  onPress={() => {
-                    if (step < 2) setStep(step + 1);
-                    else close();
+                  onPress={async () => {
+                    if (step < 2) {
+                      setStep(step + 1);
+                      return;
+                    }
+                    setSaving(true);
+                    setError(null);
+                    try {
+                      const connections =
+                        await quotaClient.createClinePassAccount({
+                          accountLabel: label,
+                          credentialLabel,
+                          apiKey: secret,
+                          routeMode: "default",
+                        });
+                      setSecret("");
+                      onSaved?.(connections);
+                      close();
+                    } catch (reason) {
+                      setError(commandErrorMessage(reason));
+                    } finally {
+                      setSaving(false);
+                    }
                   }}
                 >
-                  {step === 2 ? "保存账号" : "下一步"}
+                  {step === 2
+                    ? saving
+                      ? "保存中…"
+                      : "保存账号"
+                    : "下一步"}
                   {step < 2 && <ArrowRight size={14} />}
                 </Button>
               </div>
@@ -261,7 +367,7 @@ function RadioGroup<T extends string>({
 }: {
   value: T;
   onChange: (next: T) => void;
-  options: Array<{ id: T; label: string }>;
+  options: Array<{ id: T; label: string; disabled?: boolean }>;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -269,11 +375,13 @@ function RadioGroup<T extends string>({
         <label
           key={opt.id}
           className="flex items-center gap-2 cursor-pointer text-[12.5px] text-ink-2"
+          style={{ opacity: opt.disabled ? 0.52 : 1 }}
         >
           <input
             type="radio"
             checked={value === opt.id}
             onChange={() => onChange(opt.id)}
+            disabled={opt.disabled}
             className="accent-[var(--accent)]"
           />
           {opt.label}
