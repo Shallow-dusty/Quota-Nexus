@@ -8,7 +8,6 @@ import {
 } from "../../lib/quota-logic";
 import type { ServiceQuotaView } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
-import { StableSurface } from "../ui/surface";
 
 /** 紧凑健康摘要条（§11.2）：单行四段，不做大型 hero 卡片 */
 export function SummaryStrip({
@@ -26,7 +25,7 @@ export function SummaryStrip({
   const nearest = nearestReset(accounts);
 
   return (
-    <StableSurface className="summary-glass px-3 py-3 flex flex-wrap items-stretch gap-1 text-[12.5px]">
+    <section className="summary-board flex flex-wrap items-stretch text-[12.5px]" aria-label="额度摘要">
       <Metric
         icon={<Activity size={13} className="text-ink-3" />}
         label="正常账号"
@@ -86,7 +85,7 @@ export function SummaryStrip({
       <span className="summary-updated ml-auto self-center px-3 text-[11.5px] text-ink-3">
         上次刷新 {formatTime(refreshedAt)}
       </span>
-    </StableSurface>
+    </section>
   );
 }
 

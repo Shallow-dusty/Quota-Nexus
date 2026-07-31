@@ -156,7 +156,8 @@ Manager 或 DPAPI 的保护范围仍然是当前用户边界。
 - 桌面壳：Tauri 2。
 - 后端：Rust。
 - 前端：React + TypeScript + Vite，使用 pnpm；Tailwind CSS 4 + CSS variables 承载
-  设计 token 和布局。
+  设计 token 和布局。同一前端可在浏览器独立运行以快速迭代，正式交付由 Tauri WebView2
+  承载，不维护第二套 Web 产品。
 - 行为组件：React Aria Components 是唯一行为原语库。shadcn CLI 只允许使用 `aria`
   base 按需生成由项目拥有的源码，不引入同功能的 Radix/Base UI 版本，也不继承
   shadcn 默认视觉。
@@ -165,8 +166,10 @@ Manager 或 DPAPI 的保护范围仍然是当前用户边界。
 - 动效：Motion for React 仅用于必要状态过渡，并遵守减少动态设置。
 - 图表：实现期通过 spike 选择；要求 SVG、等效文本/表格、动态加载，实际 production
   build 的增量 chunk 目标不超过 120KB gzip，不提前把某个图库写成永久合同。
-- 视觉方向：受 Liquid Glass 启发的 Windows 桌面半透明层级与微交互。这是 UI 风格，
-  不代表采用 macOS/iOS 平台、窗口布局或原生 API；系统 Mica 只作为后期渐进增强。
+- 视觉方向：受 Liquid Glass 启发的 Windows 桌面层级与微交互。数据内容面保持稳定；
+  侧栏、工具控件和浮层使用 SVG `feDisplacementMap`、backdrop blur、边缘高光与轻微
+  按压形变。这是跨平台 WebView 渲染，不冒充 macOS 原生 `NSGlassEffectView`；Windows
+  Mica 作为桌面窗口底层的后期渐进增强。
 - 首版 UI 文案采用简体中文；国际化后置。页面、组件、状态和视觉验收以 §11、§14.5
   和 §18 为准。
 - 本地数据库：SQLite。
@@ -740,11 +743,12 @@ Liquid Glass 只表达空间层级，不改变 Windows 平台定位。所有表�
 
 | 表面 | 浅色背景 | 深色背景 | blur | saturate | 边缘与阴影 |
 | --- | --- | --- | --- | --- | --- |
-| `StableSurface` | 白色 48% | 深蓝黑 50% | 24px | 1.42 | 亮色内沿 + 低位双层投影 |
-| `ControlGlass` | 冷白 38% | 深蓝黑 44% | 34px | 1.50 | 连续亮沿，控制层不做厚重投影 |
-| `FloatingGlass` | 白色 66% | 深蓝 72% | 46px | 1.62 | 最强亮沿 + 高位长投影 |
+| `StableSurface` | 中性白 92% | 中性深灰 92% | 无 | 1.00 | 低对比描边 + 轻量投影 |
+| `ControlGlass` | 中性白 42% | 中性深灰 48% | 12–26px | 1.15–1.22 | SVG 位移折射 + 连续亮沿 |
+| `FloatingGlass` | 中性白 70% | 中性深灰 75% | 34px | 1.18 | 低强度位移折射 + 高位长投影 |
 
-三类表面都使用独立的场景色作为折射来源，而不是在卡片自身堆叠彩色渐变。关闭透明、
+折射只用于 ControlGlass 与 FloatingGlass；StableSurface 不采样背景，避免额度数据随
+场景色漂移。场景色只作为玻璃背后的环境来源，不在卡片自身堆叠彩色渐变。关闭透明、
 系统要求减少透明度或浏览器不支持 `backdrop-filter` 时，分别回退到对应实色 token。
 
 每种 surface × 浅/深色的材质参数包含 blur、saturate、背景不透明度

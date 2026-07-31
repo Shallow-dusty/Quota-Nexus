@@ -7,6 +7,7 @@ mkdirSync(OUT, { recursive: true });
 const shots = [
   { name: "overview-light", theme: "light", width: 1440, height: 900, page: "overview" },
   { name: "overview-dark", theme: "dark", width: 1440, height: 900, page: "overview" },
+  { name: "overview-solid", theme: "light", transparency: "off", width: 1440, height: 900, page: "overview" },
   { name: "overview-960", theme: "light", width: 960, height: 640, page: "overview" },
   { name: "overview-640", theme: "light", width: 640, height: 720, page: "overview" },
   { name: "accounts-light", theme: "light", width: 1440, height: 900, page: "accounts" },
@@ -61,10 +62,10 @@ await page.goto("http://127.0.0.1:1420/", { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "概览" }).waitFor({ state: "visible" });
 
 for (const shot of shots) {
-  await page.evaluate((t) => {
-    document.documentElement.dataset.theme = t;
-    document.documentElement.dataset.transparency = "on";
-  }, shot.theme);
+  await page.evaluate(({ theme, transparency }) => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.transparency = transparency ?? "on";
+  }, shot);
   await page.evaluate((p) => {
     const nav = [...document.querySelectorAll("nav button")];
     const target = nav.find((b) => b.textContent?.includes(

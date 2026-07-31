@@ -10,6 +10,7 @@ import { Button } from "react-aria-components";
 import type { PageId } from "../../lib/quota-types";
 import { AppMark } from "./app-mark";
 import { ControlGlass } from "../ui/surface";
+import { LiquidFilters } from "../ui/liquid-filters";
 
 const NAV: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> =
   [
@@ -35,6 +36,7 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="app-canvas app-shell h-full flex">
+      <LiquidFilters />
       <ControlGlass
         as="nav"
         className={`app-sidebar shrink-0 flex flex-col transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
@@ -49,11 +51,11 @@ export function AppShell({
           <AppMark size={32} />
           {!collapsed && (
             <div className="brand-copy leading-tight">
-              <div className="text-[14px] font-semibold tracking-tight text-ink-1">
-                AI 额度中心
+              <div className="text-[13.5px] font-semibold tracking-tight text-ink-1">
+                Quota Monitor
               </div>
-              <div className="text-[9.5px] text-ink-3 tracking-[0.18em] mt-1">
-                QUOTA MONITOR
+              <div className="text-[10px] text-ink-3 mt-0.5">
+                AI 服务额度
               </div>
             </div>
           )}
@@ -77,7 +79,7 @@ export function AppShell({
           })}
         </ul>
 
-        <div className="p-2 border-t border-[var(--line)]">
+        <div className="sidebar-footer p-2">
           <Button
             onPress={onToggleCollapsed}
             className="btn sidebar-collapse w-full !text-ink-3"
@@ -114,7 +116,7 @@ export function PageHeader({
   return (
     <header className="page-header h-[72px] shrink-0 flex items-center justify-between gap-4 px-7">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold leading-tight text-ink-1 truncate tracking-[-0.03em]">
+        <h1 className="text-[21px] font-semibold leading-tight text-ink-1 truncate tracking-[-0.025em]">
           {title}
         </h1>
         {subtitle && (

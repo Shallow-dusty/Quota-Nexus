@@ -18,7 +18,7 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 | --- | --- |
 | 产品形态 | Windows 优先的 Tauri 2 本地桌面应用 |
 | 前后端 | React + TypeScript UI，Rust Core，SQLite |
-| 前端体验 | Windows Liquid Glass 风格；三层材质、三页面 MVP、React Aria 单一行为层 |
+| 前端体验 | Web-first React UI、Tauri 桌面交付；稳定内容面 + SVG 折射控制层 + 浮层三层材质 |
 | 账号模型 | 三家供应商、多账号；凭据与账号 N:1，可让一个登录态覆盖多个 Workspace |
 | 数据采集 | 首期通过额度 API 或 Dashboard；以后可接入客户端或请求链路数据 |
 | 调度 | 默认 15 分钟；达到 Warning 后提高到 5 分钟，带迟滞、退避和供应商级熔断 |
@@ -36,10 +36,11 @@ AI Quota Monitor 是一个统一管理 AI 服务额度的本地工具。首个�
 
 当前状态：Phase 0 已完成。三个只读探针均已通过真实账号验证，匿名鉴权行为、显式代理
 失败不回退、默认 TUN 路由和脱敏证据均已验证（见 `docs/provider-contracts/`）。
-Phase 1 前端静态矩阵已完成液态玻璃视觉重构：场景折射背景、三类材质
-（StableSurface/ControlGlass/FloatingGlass）、Overview/Accounts/Settings 三页、
-五种数据状态与添加账号分步 Dialog。当前由 Phase 0 脱敏样本驱动，`pnpm visual:check`
-会覆盖浅/深色、640/960/1440 宽度、三页与 Dialog，并对空白截图及浏览器告警失败；
+Phase 1 前端静态矩阵已完成第二版视觉重构：React 前端可在普通浏览器独立预览，Tauri
+负责正式桌面交付；额度卡、表格和表单使用稳定内容面，侧栏、工具按钮、分段选择器和
+Dialog 使用 SVG 位移折射与 backdrop blur 组成的控制玻璃。Overview/Accounts/Settings
+三页、五种数据状态与添加账号分步 Dialog 均已覆盖。当前由 Phase 0 脱敏样本驱动，
+`pnpm visual:check` 会覆盖浅/深色、640/960/1440 宽度、三页与 Dialog，并对空白截图及浏览器告警失败；
 下一步接入 Tauri Core、Windows Credential Manager 与 ClinePass 实时刷新，完成首个
 前后端纵向切片。
 已结束的评审记录保存在 `docs/archive/`（[历程索引](docs/archive/README.md)），日常开发无需读取。

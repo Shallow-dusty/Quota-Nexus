@@ -9,7 +9,7 @@ const META: Record<
   "ollama-cloud": { hue: "var(--provider-ollama)", glyph: "OL", title: "Ollama Cloud" },
 };
 
-/** 供应商文字标：不伪造品牌 Logo，玻璃底色仅用于快速识别。 */
+/** 供应商文字标：不伪造品牌 Logo，以中性字标提供稳定识别。 */
 export function ProviderMark({
   provider,
   size = 28,

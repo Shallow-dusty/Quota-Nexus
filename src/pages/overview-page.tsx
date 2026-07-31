@@ -85,7 +85,7 @@ export function OverviewPage({
                 { id: "stale", label: "陈旧" },
               ]}
             />
-            <Button className="btn btn-outline" onPress={() => refreshAll()} isDisabled={refreshing}>
+            <Button className="btn btn-glass" onPress={() => refreshAll()} isDisabled={refreshing}>
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
               <span>全部刷新</span>
             </Button>

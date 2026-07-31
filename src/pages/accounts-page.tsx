@@ -24,7 +24,7 @@ export function AccountsPage() {
         title="账号与连接"
         subtitle="管理供应商账号、凭据复用与固定网络出口"
         actions={
-          <Button className="btn btn-accent" onPress={() => setOpen(true)}>
+          <Button className="btn btn-prominent" onPress={() => setOpen(true)}>
             <Plus size={14} />
             添加账号
           </Button>
