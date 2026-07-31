@@ -369,7 +369,7 @@ pub async fn validate_provider(
     input: ValidateProviderInput,
 ) -> Result<ProviderValidationView, CommandError> {
     validate_provider_name(&input.provider)?;
-    let secret = validated_secret(input.secret)?;
+    let secret = validated_secret(&input.provider, input.secret)?;
     let route = resolve_route(&state.db, input.route).await?;
     let result = fetch_provider(
         &input.provider,
@@ -435,7 +435,7 @@ pub(crate) async fn create_provider_account_core(
         return storage::connections(db).await;
     }
     let credential_label = validated_label(input.credential_label, "凭据标签")?;
-    let secret = validated_secret(input.secret)?;
+    let secret = validated_secret(&input.provider, input.secret)?;
     let route = resolve_route(db, input.route).await?;
     let payload = fetch_provider(
         &input.provider,
@@ -490,8 +490,8 @@ pub async fn update_credential(
     if credential_id.is_empty() {
         return Err(CommandError::validation("请选择要更新的凭据"));
     }
-    let secret = validated_secret(input.secret)?;
     let context = storage::credential_context(&state.db, credential_id).await?;
+    let secret = validated_secret(&context.provider, input.secret)?;
     let client = client_for_credential(&context)?;
     fetch_provider(
         &context.provider,
@@ -614,7 +614,7 @@ async fn refresh_target(
         Err(_) => {
             storage::update_failure(pool, &target, &CommandError::auth(), explicit).await?;
             let events = storage::evaluate_health_alert(pool, &target.id, "auth").await?;
-            send_alerts(app, events);
+            send_alerts(app, pool, events).await;
             return Ok(());
         }
     };
@@ -628,7 +628,7 @@ async fn refresh_target(
                 error.category()
             };
             let events = storage::evaluate_health_alert(pool, &target.id, category).await?;
-            send_alerts(app, events);
+            send_alerts(app, pool, events).await;
             return Ok(());
         }
     };
@@ -660,7 +660,7 @@ async fn refresh_target(
             .await?;
             let mut events = storage::evaluate_quota_alerts(pool, &target.id, &windows).await?;
             events.extend(storage::evaluate_health_alert(pool, &target.id, "normal").await?);
-            send_alerts(app, events);
+            send_alerts(app, pool, events).await;
             Ok(())
         }
         Err(error) => {
@@ -671,20 +671,28 @@ async fn refresh_target(
                 error.category()
             };
             let events = storage::evaluate_health_alert(pool, &target.id, category).await?;
-            send_alerts(app, events);
+            send_alerts(app, pool, events).await;
             Ok(())
         }
     }
 }
 
-fn send_alerts(app: &tauri::AppHandle, events: Vec<storage::AlertEvent>) {
+async fn send_alerts(
+    app: &tauri::AppHandle,
+    pool: &SqlitePool,
+    events: Vec<storage::AlertEvent>,
+) {
     for event in events {
-        let _ = app
+        let delivered = app
             .notification()
             .builder()
-            .title(event.title)
-            .body(event.body)
-            .show();
+            .title(event.title.clone())
+            .body(event.body.clone())
+            .show()
+            .is_ok();
+        if delivered {
+            let _ = storage::mark_alert_notified(pool, &event).await;
+        }
     }
 }
 
@@ -875,8 +883,9 @@ fn route_error(error: CommandError, explicit: bool) -> CommandError {
     }
 }
 
-fn validated_secret(value: String) -> Result<Zeroizing<String>, CommandError> {
-    let value = Zeroizing::new(value.trim().to_string());
+fn validated_secret(provider: &str, value: String) -> Result<Zeroizing<String>, CommandError> {
+    let value = normalize_credential(provider, value.trim());
+    let value = Zeroizing::new(value);
     if value.is_empty() {
         return Err(CommandError::validation("请填写供应商凭据"));
     }
@@ -886,6 +895,66 @@ fn validated_secret(value: String) -> Result<Zeroizing<String>, CommandError> {
         ));
     }
     Ok(value)
+}
+
+fn normalize_credential(provider: &str, input: &str) -> String {
+    let header_names: &[&str] = match provider {
+        "clinepass" => &["authorization"],
+        "opencode-go" => &["cookie"],
+        "ollama-cloud" => &["authorization", "cookie"],
+        _ => &[],
+    };
+    let from_json = serde_json::from_str::<serde_json::Value>(input)
+        .ok()
+        .and_then(|value| find_header_value(&value, header_names));
+    let from_header_lines = input.lines().find_map(|line| {
+        let line = line.trim().trim_matches(|ch| matches!(ch, '\'' | '"'));
+        let (name, value) = line.split_once(':')?;
+        header_names
+            .iter()
+            .any(|candidate| name.trim().eq_ignore_ascii_case(candidate))
+            .then(|| value.trim().trim_matches(|ch| matches!(ch, '\'' | '"')).to_string())
+    });
+    let normalized = from_json
+        .or(from_header_lines)
+        .unwrap_or_else(|| input.trim().to_string());
+    if provider == "clinepass" || (provider == "ollama-cloud" && !normalized.contains('=')) {
+        normalized
+            .strip_prefix("Bearer ")
+            .or_else(|| normalized.strip_prefix("bearer "))
+            .unwrap_or(&normalized)
+            .trim()
+            .to_string()
+    } else {
+        normalized
+    }
+}
+
+fn find_header_value(value: &serde_json::Value, header_names: &[&str]) -> Option<String> {
+    match value {
+        serde_json::Value::Object(object) => {
+            let direct = object
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .filter(|name| {
+                    header_names
+                        .iter()
+                        .any(|candidate| name.eq_ignore_ascii_case(candidate))
+                })
+                .and_then(|_| object.get("value"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string);
+            direct.or_else(|| {
+                object
+                    .values()
+                    .find_map(|nested| find_header_value(nested, header_names))
+            })
+        }
+        serde_json::Value::Array(values) => values
+            .iter()
+            .find_map(|nested| find_header_value(nested, header_names)),
+        _ => None,
+    }
 }
 
 fn validated_label(value: String, field: &str) -> Result<String, CommandError> {
@@ -918,6 +987,32 @@ mod tests {
         let masked = masked_workspace_suffix("wrk_01ABCDEF");
         assert_eq!(masked, "wrk_••••CDEF");
         assert!(!masked.contains("01AB"));
+    }
+
+    #[test]
+    fn extracts_provider_credentials_from_firefox_request_json() {
+        let request = r#"{
+          "requestHeaders":{"headers":[
+            {"name":"Accept","value":"text/html"},
+            {"name":"Cookie","value":"auth=session-value; flag=1"}
+          ]}
+        }"#;
+        assert_eq!(
+            normalize_credential("opencode-go", request),
+            "auth=session-value; flag=1"
+        );
+    }
+
+    #[test]
+    fn normalizes_authorization_headers_without_damaging_ollama_keys() {
+        assert_eq!(
+            normalize_credential("clinepass", "Authorization: Bearer cline-key"),
+            "cline-key"
+        );
+        assert_eq!(
+            normalize_credential("ollama-cloud", "ollama.key"),
+            "ollama.key"
+        );
     }
 
     #[test]

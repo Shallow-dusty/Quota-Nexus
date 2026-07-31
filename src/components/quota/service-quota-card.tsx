@@ -89,9 +89,10 @@ export function ServiceQuotaCard({
         <div className="flex items-center gap-1">
           <Button
             onPress={() => onRefresh?.(account.id)}
-            isDisabled={refreshing || stale || paused}
+            isDisabled={refreshing || paused || account.errorCategory === "auth"}
             className="btn btn-icon"
             aria-label="刷新此账号"
+            data-tooltip="刷新此账号"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
           </Button>
@@ -99,6 +100,7 @@ export function ServiceQuotaCard({
             onPress={() => onMore?.(account.id)}
             className="btn btn-icon"
             aria-label="更多操作"
+            data-tooltip="在账号与连接中管理"
           >
             <MoreHorizontal size={15} />
           </Button>

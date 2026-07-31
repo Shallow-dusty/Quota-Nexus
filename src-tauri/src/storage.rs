@@ -142,8 +142,29 @@ pub struct AppSettingsRecord {
 
 #[derive(Debug, Clone)]
 pub struct AlertEvent {
+    pub account_id: String,
+    pub alert_key: String,
+    pub generation: i64,
+    pub state: String,
     pub title: String,
     pub body: String,
+}
+
+#[derive(Debug, FromRow)]
+struct QuotaAlertStateRow {
+    state: String,
+    period_key: Option<String>,
+    generation: i64,
+    pending_generation: Option<i64>,
+    pending_state: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct HealthAlertStateRow {
+    state: String,
+    generation: i64,
+    pending_generation: Option<i64>,
+    pending_state: Option<String>,
 }
 
 #[derive(Debug)]
@@ -692,12 +713,17 @@ pub async fn refresh_targets(
                 JOIN credentials c ON c.id = a.credential_id
                 LEFT JOIN network_profiles n ON n.id = c.network_profile_id
                 JOIN provider_health h ON h.provider = a.provider
-                WHERE a.enabled = 1 AND a.auth_paused = 0
-                  AND (
-                    h.circuit_state = 'closed' OR
-                    (h.next_probe_at IS NOT NULL AND h.next_probe_at <= ?)
-                  )";
+                WHERE a.enabled = 1 AND a.auth_paused = 0";
     let now = Utc::now().to_rfc3339();
+    let circuit_filter = if manual {
+        String::new()
+    } else {
+        " AND (
+            h.circuit_state = 'closed' OR
+            (h.next_probe_at IS NOT NULL AND h.next_probe_at <= ?)
+          )"
+        .into()
+    };
     let schedule_filter = if manual {
         String::new()
     } else {
@@ -706,21 +732,21 @@ pub async fn refresh_targets(
             .into()
     };
     let rows_result = if let Some(id) = account_id {
-        let query = format!("{base}{schedule_filter} AND a.id = ?");
-        let query = sqlx::query_as::<_, RefreshTarget>(&query).bind(&now);
+        let query = format!("{base}{circuit_filter}{schedule_filter} AND a.id = ?");
+        let query = sqlx::query_as::<_, RefreshTarget>(&query);
         let query = if manual {
             query
         } else {
-            query.bind(&now).bind(&now)
+            query.bind(&now).bind(&now).bind(&now)
         };
         query.bind(id).fetch_all(pool).await
     } else {
-        let query = format!("{base}{schedule_filter} ORDER BY a.next_refresh_at ASC");
-        let query = sqlx::query_as::<_, RefreshTarget>(&query).bind(&now);
+        let query = format!("{base}{circuit_filter}{schedule_filter} ORDER BY a.next_refresh_at ASC");
+        let query = sqlx::query_as::<_, RefreshTarget>(&query);
         let query = if manual {
             query
         } else {
-            query.bind(&now).bind(&now)
+            query.bind(&now).bind(&now).bind(&now)
         };
         query.fetch_all(pool).await
     };
@@ -1228,9 +1254,16 @@ pub async fn evaluate_quota_alerts(
     let mut events = Vec::new();
     for window in windows {
         let key = format!("quota:{}", window.kind);
-        let period_key = window.resets_at.as_deref().unwrap_or("unknown");
-        let existing: Option<(String, Option<String>, i64, Option<String>)> = sqlx::query_as(
-            "SELECT state, period_key, generation, last_notified_at
+        // OpenCode Go exposes relative resetInSec values. Converting those to
+        // RFC3339 creates a slightly different timestamp on every refresh, so
+        // it must not be used as a notification-period identity.
+        let period_key = if provider == "opencode-go" {
+            "relative-window"
+        } else {
+            window.resets_at.as_deref().unwrap_or("unknown")
+        };
+        let existing = sqlx::query_as::<_, QuotaAlertStateRow>(
+            "SELECT state, period_key, generation, pending_generation, pending_state
              FROM alert_states WHERE account_id = ? AND alert_key = ?",
         )
         .bind(account_id)
@@ -1238,9 +1271,20 @@ pub async fn evaluate_quota_alerts(
         .fetch_optional(&mut *tx)
         .await
         .map_err(|_| CommandError::storage("无法读取额度告警状态"))?;
-        let (mut previous, previous_period, mut generation, previous_notified) =
-            existing.unwrap_or_else(|| ("normal".into(), None, 0, None));
-        if previous_period.as_deref() != Some(period_key) {
+        let existing = existing.unwrap_or(QuotaAlertStateRow {
+            state: "normal".into(),
+            period_key: None,
+            generation: 0,
+            pending_generation: None,
+            pending_state: None,
+        });
+        let mut previous = existing.state;
+        let previous_period = existing.period_key;
+        let mut generation = existing.generation;
+        let previous_pending_generation = existing.pending_generation;
+        let previous_pending_state = existing.pending_state;
+        let period_changed = previous_period.as_deref() != Some(period_key);
+        if period_changed {
             previous = "normal".into();
             generation += 1;
         }
@@ -1255,9 +1299,23 @@ pub async fn evaluate_quota_alerts(
             computed
         };
         let next_rank = alert_rank(next);
-        let should_notify = next_rank > previous_rank
-            || (previous_rank > 0 && next_rank == 0 && settings.notify_recovery);
-        if should_notify {
+        if !period_changed && previous_rank == 0 && next_rank > 0 {
+            generation += 1;
+        }
+        let notification_enabled = next_rank > 0 || settings.notify_recovery;
+        let starts_notification = notification_enabled
+            && (next_rank > previous_rank || (previous_rank > 0 && next_rank == 0));
+        let (pending_generation, pending_state) = if starts_notification {
+            (Some(generation), Some(next.to_string()))
+        } else if notification_enabled
+            && previous_pending_generation == Some(generation)
+            && previous_pending_state.as_deref() == Some(next)
+        {
+            (previous_pending_generation, previous_pending_state)
+        } else {
+            (None, None)
+        };
+        if pending_generation == Some(generation) && pending_state.as_deref() == Some(next) {
             let title = if next_rank == 0 {
                 "额度状态已恢复".to_string()
             } else {
@@ -1280,23 +1338,26 @@ pub async fn evaluate_quota_alerts(
                     window.used_percent
                 )
             };
-            events.push(AlertEvent { title, body });
+            events.push(AlertEvent {
+                account_id: account_id.to_string(),
+                alert_key: key.clone(),
+                generation,
+                state: next.to_string(),
+                title,
+                body,
+            });
         }
-        let notified_at = if should_notify {
-            Some(now.clone())
-        } else {
-            previous_notified
-        };
         sqlx::query(
             "INSERT INTO alert_states
              (account_id, alert_key, period_key, generation, state,
-              last_notified_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+              last_notified_at, updated_at, pending_generation, pending_state)
+             VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)
              ON CONFLICT(account_id, alert_key) DO UPDATE SET
                period_key = excluded.period_key,
                generation = excluded.generation,
                state = excluded.state,
-               last_notified_at = excluded.last_notified_at,
+               pending_generation = excluded.pending_generation,
+               pending_state = excluded.pending_state,
                updated_at = excluded.updated_at",
         )
         .bind(account_id)
@@ -1304,8 +1365,9 @@ pub async fn evaluate_quota_alerts(
         .bind(period_key)
         .bind(generation)
         .bind(next)
-        .bind(notified_at)
         .bind(&now)
+        .bind(pending_generation)
+        .bind(&pending_state)
         .execute(&mut *tx)
         .await
         .map_err(|_| CommandError::storage("无法保存额度告警状态"))?;
@@ -1328,53 +1390,69 @@ pub async fn evaluate_health_alert(
             .fetch_one(pool)
             .await
             .map_err(|_| CommandError::storage("无法读取健康告警账号"))?;
-    let existing: Option<(String, i64, Option<String>)> = sqlx::query_as(
-        "SELECT state, generation, last_notified_at
+    let existing = sqlx::query_as::<_, HealthAlertStateRow>(
+        "SELECT state, generation, pending_generation, pending_state
          FROM alert_states WHERE account_id = ? AND alert_key = 'health'",
     )
     .bind(account_id)
     .fetch_optional(pool)
     .await
     .map_err(|_| CommandError::storage("无法读取健康告警状态"))?;
-    let (previous, generation, previous_notified) =
-        existing.unwrap_or_else(|| ("normal".into(), 0, None));
+    let existing = existing.unwrap_or(HealthAlertStateRow {
+        state: "normal".into(),
+        generation: 0,
+        pending_generation: None,
+        pending_state: None,
+    });
+    let previous = existing.state;
+    let generation = existing.generation;
+    let previous_pending_generation = existing.pending_generation;
+    let previous_pending_state = existing.pending_state;
     let changed = previous != next_state;
-    let should_notify = changed
-        && match next_state {
-            "normal" => previous != "normal" && settings.notify_recovery,
-            "auth" => settings.notify_auth,
-            _ => settings.notify_stale,
-        };
-    let now = Utc::now().to_rfc3339();
-    let notified_at = if should_notify {
-        Some(now.clone())
-    } else {
-        previous_notified
+    let notification_enabled = match next_state {
+        "normal" => settings.notify_recovery,
+        "auth" => settings.notify_auth,
+        _ => settings.notify_stale,
     };
-    sqlx::query(
-        "INSERT INTO alert_states
-         (account_id, alert_key, period_key, generation, state,
-          last_notified_at, updated_at)
-         VALUES (?, 'health', NULL, ?, ?, ?, ?)
-         ON CONFLICT(account_id, alert_key) DO UPDATE SET
-           generation = excluded.generation,
-           state = excluded.state,
-           last_notified_at = excluded.last_notified_at,
-           updated_at = excluded.updated_at",
-    )
-    .bind(account_id)
-    .bind(if previous == "normal" && next_state != "normal" {
+    let starts_notification = changed && notification_enabled;
+    let next_generation = if previous == "normal" && next_state != "normal" {
         generation + 1
     } else {
         generation
-    })
+    };
+    let (pending_generation, pending_state) = if starts_notification {
+        (Some(next_generation), Some(next_state.to_string()))
+    } else if notification_enabled
+        && previous_pending_generation == Some(next_generation)
+        && previous_pending_state.as_deref() == Some(next_state)
+    {
+        (previous_pending_generation, previous_pending_state)
+    } else {
+        (None, None)
+    };
+    let now = Utc::now().to_rfc3339();
+    sqlx::query(
+        "INSERT INTO alert_states
+         (account_id, alert_key, period_key, generation, state,
+          last_notified_at, updated_at, pending_generation, pending_state)
+         VALUES (?, 'health', NULL, ?, ?, NULL, ?, ?, ?)
+         ON CONFLICT(account_id, alert_key) DO UPDATE SET
+           generation = excluded.generation,
+           state = excluded.state,
+           pending_generation = excluded.pending_generation,
+           pending_state = excluded.pending_state,
+           updated_at = excluded.updated_at",
+    )
+    .bind(account_id)
+    .bind(next_generation)
     .bind(next_state)
-    .bind(notified_at)
     .bind(&now)
+    .bind(pending_generation)
+    .bind(&pending_state)
     .execute(pool)
     .await
     .map_err(|_| CommandError::storage("无法保存健康告警状态"))?;
-    if !should_notify {
+    if pending_generation != Some(next_generation) || pending_state.as_deref() != Some(next_state) {
         return Ok(Vec::new());
     }
     let title = match next_state {
@@ -1385,9 +1463,40 @@ pub async fn evaluate_health_alert(
         _ => "额度数据已陈旧",
     };
     Ok(vec![AlertEvent {
+        account_id: account_id.to_string(),
+        alert_key: "health".into(),
+        generation: next_generation,
+        state: next_state.to_string(),
         title: title.into(),
         body: format!("{} · {}", provider_name(&provider), account_label),
     }])
+}
+
+pub async fn mark_alert_notified(
+    pool: &SqlitePool,
+    event: &AlertEvent,
+) -> Result<(), CommandError> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query(
+        "UPDATE alert_states
+         SET last_notified_at = ?, pending_generation = NULL,
+             pending_state = NULL, updated_at = ?
+         WHERE account_id = ? AND alert_key = ?
+           AND generation = ? AND state = ?
+           AND pending_generation = ? AND pending_state = ?",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&event.account_id)
+    .bind(&event.alert_key)
+    .bind(event.generation)
+    .bind(&event.state)
+    .bind(event.generation)
+    .bind(&event.state)
+    .execute(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法确认 Windows 通知投递"))?;
+    Ok(())
 }
 
 fn quota_alert_state(used_percent: f64, settings: &AppSettingsRecord) -> &'static str {
@@ -1711,7 +1820,15 @@ mod tests {
             .find(|item| item.provider == "clinepass")
             .unwrap();
         assert_eq!(health.circuit_state, "open");
-        assert!(refresh_targets(&pool, Some("account-test"), true)
+        assert_eq!(
+            refresh_targets(&pool, Some("account-test"), true)
+                .await
+                .unwrap()
+                .len(),
+            1,
+            "用户手动刷新应允许提前发起一次半开探测"
+        );
+        assert!(refresh_targets(&pool, Some("account-test"), false)
             .await
             .unwrap()
             .is_empty());
@@ -1814,24 +1931,29 @@ mod tests {
     async fn deduplicates_and_rearms_quota_and_health_alerts() {
         let pool = seeded_pool("clinepass").await;
         let warning = quota_window(72.0);
+        let first_warning =
+            evaluate_quota_alerts(&pool, "account-test", std::slice::from_ref(&warning))
+                .await
+                .unwrap();
+        assert_eq!(first_warning.len(), 1);
         assert_eq!(
             evaluate_quota_alerts(&pool, "account-test", std::slice::from_ref(&warning))
                 .await
                 .unwrap()
                 .len(),
-            1
+            1,
+            "未确认投递前必须保持待发送"
         );
+        mark_alert_notified(&pool, &first_warning[0]).await.unwrap();
         assert!(evaluate_quota_alerts(&pool, "account-test", &[warning])
             .await
             .unwrap()
             .is_empty());
-        assert_eq!(
-            evaluate_quota_alerts(&pool, "account-test", &[quota_window(87.0)])
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
+        let high = evaluate_quota_alerts(&pool, "account-test", &[quota_window(87.0)])
+            .await
+            .unwrap();
+        assert_eq!(high.len(), 1);
+        mark_alert_notified(&pool, &high[0]).await.unwrap();
         assert!(
             evaluate_quota_alerts(&pool, "account-test", &[quota_window(64.0)])
                 .await
@@ -1846,14 +1968,39 @@ mod tests {
             1
         );
 
+        let auth = evaluate_health_alert(&pool, "account-test", "auth")
+            .await
+            .unwrap();
+        assert_eq!(auth.len(), 1);
         assert_eq!(
             evaluate_health_alert(&pool, "account-test", "auth")
                 .await
                 .unwrap()
                 .len(),
-            1
+            1,
+            "健康通知失败时也必须重试"
         );
+        mark_alert_notified(&pool, &auth[0]).await.unwrap();
         assert!(evaluate_health_alert(&pool, "account-test", "auth")
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn opencode_relative_reset_timestamp_does_not_rearm_alerts() {
+        let pool = seeded_pool("opencode-go").await;
+        let mut first = quota_window(72.0);
+        first.resets_at = Some("2026-08-03T00:00:00.100Z".into());
+        let event = evaluate_quota_alerts(&pool, "account-test", &[first])
+            .await
+            .unwrap()
+            .remove(0);
+        mark_alert_notified(&pool, &event).await.unwrap();
+
+        let mut next = quota_window(72.0);
+        next.resets_at = Some("2026-08-03T00:00:05.900Z".into());
+        assert!(evaluate_quota_alerts(&pool, "account-test", &[next])
             .await
             .unwrap()
             .is_empty());

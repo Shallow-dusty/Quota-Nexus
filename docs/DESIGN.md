@@ -64,7 +64,7 @@ AI Quota Monitor 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放
 | --- | --- | --- | --- |
 | ClinePass | `GET https://api.cline.bot/api/v1/users/me/plan/usage-limits` | API Key | 5 小时、周、月 |
 | OpenCode Go | `https://opencode.ai/_server` 与 Workspace Go 页面 | `auth` Cookie | 5 小时、周、月 |
-| Ollama Cloud | `GET https://ollama.com/settings` | 完整 Cookie header | Session、Weekly |
+| Ollama Cloud | `GET https://ollama.com/api/usage`（主）/ `/settings`（兼容） | API Key（主）/完整 Cookie header（兼容） | Session、Weekly |
 
 适配器只返回 Provider 原生窗口；Core 将其归一为：
 
@@ -108,12 +108,14 @@ AIQuotaMonitor/NetworkProfile/<uuid>  代理用户名/密码
 - 更新凭据覆盖 WCM 旧值；删除最后一个共享账号时同时清理对应 WCM 条目。
 - 删除仍被 Credential 引用的 NetworkProfile 会被拒绝。
 
-当前已验证的三种真实凭据均可由 WCM 存储。若未来供应商凭据超过 WCM 可接受范围，再引入
+录入层会从 Firefox 请求头 JSON 或普通请求头文本中提取 Cookie/Authorization；前端不需要
+用户手工裁剪字段。Ollama API Key、ClinePass API Key 与兼容 Cookie 均由 WCM 存储。
+若未来供应商凭据超过 WCM 可接受范围，再引入
 CurrentUser DPAPI 后备；MVP 不维护一套当前没有真实需求的第二秘密存储实现。
 
 ## 5. 数据模型
 
-SQLite schema 由四个 migration 演进：
+SQLite schema 由五个 migration 演进：
 
 | 表 | 职责 |
 | --- | --- |
@@ -124,7 +126,7 @@ SQLite schema 由四个 migration 演进：
 | `quota_history` | 成功刷新历史，按 7/30/90 天策略清理 |
 | `app_settings` | 刷新、阈值、历史、托盘、自启、隐私和通知设置 |
 | `provider_health` | Provider 熔断、失败计数和下一次探测 |
-| `alert_states` | 账号+窗口的状态代次和通知去重 |
+| `alert_states` | 账号+窗口的状态代次、待投递事件和成功通知确认 |
 
 SQLite 每次连接启用 `foreign_keys=ON`、WAL 和 5 秒 busy timeout。刷新失败只更新错误与调度
 状态，不覆盖 `quota_snapshots`，因此 UI 可以同时展示最后成功额度和“陈旧/失败”状态。
@@ -149,7 +151,10 @@ SQLite 每次连接启用 `foreign_keys=ON`、WAL 和 5 秒 busy timeout。刷�
 
 默认阈值是 Warning 70%、High 85%、Critical 95%，要求严格递增。`alert_states` 以
 `account + alert_key + period_key + generation` 表达状态代次：同一级别不重复通知，升级时
-再次通知，窗口周期改变或用量低于 Warning 5 个百分点后重新武装。
+再次通知，窗口周期改变或用量低于 Warning 5 个百分点后重新武装。告警先以 pending 状态
+持久化，只有 Windows Toast 返回成功后才写入 `last_notified_at` 并清除 pending；发送失败会
+在后续刷新中重试，不会被误判为已通知。OpenCode Go 的 `resetInSec` 是相对值，不作为
+`period_key`；它依靠用量回落后的状态跃迁重新武装，避免每轮换算时间戳触发重复告警。
 
 认证、网络/陈旧、parser、固定出口和恢复事件共用同一持久化健康状态。应用重启不会重新
 轰炸已通知状态。
@@ -246,7 +251,7 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 | `cargo clippy --all-targets -- -D warnings` | 通过 |
 | `pnpm build` | 通过，JS 约 103KB gzip |
 | `pnpm visual:check` | 14 个视觉场景 + 50 账号场景通过 |
-| 真实本机数据 | schema 4；4 账号、三家 Provider 最近刷新健康 |
+| 真实本机数据 | 迁移目标 schema 5；已安装实例下次启动时升级；4 账号、三家 Provider 曾完成真实刷新 |
 
 ## 11. 后续演进
 

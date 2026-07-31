@@ -62,7 +62,9 @@ page.on("console", (m) => {
 });
 page.on("pageerror", (error) => browserProblems.push(`PAGE ERROR: ${error.message}`));
 
-await page.goto("http://127.0.0.1:1420/", { waitUntil: "networkidle" });
+// Vite keeps its HMR connection alive in development, so networkidle is not a
+// meaningful readiness signal. The visible app heading below is the contract.
+await page.goto("http://127.0.0.1:1420/", { waitUntil: "domcontentloaded" });
 await page.getByRole("heading", { name: "概览" }).waitFor({ state: "visible" });
 
 for (const shot of shots) {

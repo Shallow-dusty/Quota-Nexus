@@ -236,6 +236,7 @@ function ConnectionRow({
           onPress={onVerify}
           isDisabled={busy || connection.authPaused || !connection.enabled}
           aria-label="立即验证"
+          data-tooltip="立即刷新并验证"
         >
           <RefreshCw size={14} className={busy ? "animate-spin" : ""} />
         </Button>
@@ -244,6 +245,7 @@ function ConnectionRow({
           onPress={onToggle}
           isDisabled={busy}
           aria-label={connection.enabled ? "暂停账号" : "恢复账号"}
+          data-tooltip={connection.enabled ? "暂停自动刷新" : "恢复自动刷新"}
         >
           {connection.enabled ? <Pause size={14} /> : <Play size={14} />}
         </Button>
@@ -251,6 +253,7 @@ function ConnectionRow({
           className="btn btn-icon"
           onPress={onCredential}
           aria-label="更新凭据"
+          data-tooltip="更新此账号使用的凭据"
         >
           <KeyRound size={14} />
         </Button>
@@ -258,6 +261,7 @@ function ConnectionRow({
           className="btn btn-icon"
           onPress={onEdit}
           aria-label="编辑账号标签"
+          data-tooltip="编辑账号标签"
         >
           <Pencil size={14} />
         </Button>
@@ -266,6 +270,7 @@ function ConnectionRow({
           onPress={onDelete}
           isDisabled={busy}
           aria-label="删除本地账号"
+          data-tooltip="删除本地账号"
         >
           <Trash2 size={14} />
         </Button>
@@ -380,10 +385,17 @@ function UpdateCredentialDialog({
               value={secret}
               onChange={(event) => setSecret(event.target.value)}
               placeholder={
-                account?.provider === "clinepass" ? "粘贴新的 API Key" : "粘贴新的完整 Cookie"
+                account?.provider === "clinepass"
+                  ? "粘贴新的 API Key 或 Authorization 请求头"
+                  : account?.provider === "ollama-cloud"
+                    ? "粘贴新的 API Key（推荐）或兼容 Cookie"
+                    : "粘贴新的 Cookie 或 Firefox 请求头 JSON"
               }
               className="mt-4 w-full px-2.5 py-2 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[rgba(127,141,168,.06)] border border-[var(--line)] outline-none focus:border-[var(--accent)] resize-none"
             />
+            <p className="mt-2 text-[11px] text-ink-3">
+              可直接粘贴请求头 JSON；应用会自动提取所需字段。
+            </p>
             {error && <p className="mt-2 text-[11px] text-[var(--danger)]">{error}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <Button className="btn btn-outline" onPress={onClose}>取消</Button>

@@ -18,7 +18,7 @@ import { ProviderMark } from "./provider-mark";
 const PROVIDERS: Array<{ id: ProviderKind; name: string; hint: string }> = [
   { id: "clinepass", name: "Cline Pass", hint: "API Key · 5h/周/月窗口" },
   { id: "opencode-go", name: "OpenCode Go", hint: "Cookie · 多工作区 · 5h/周/月" },
-  { id: "ollama-cloud", name: "Ollama Cloud", hint: "Cookie · Session/Weekly" },
+  { id: "ollama-cloud", name: "Ollama Cloud", hint: "API Key（推荐）· Session/Weekly" },
 ];
 
 export function AddAccountDialog({
@@ -46,9 +46,6 @@ export function AddAccountDialog({
   const [proxyUrl, setProxyUrl] = useState("");
   const [proxyUsername, setProxyUsername] = useState("");
   const [proxyPassword, setProxyPassword] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const [discoveredAccountCount, setDiscoveredAccountCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,9 +64,6 @@ export function AddAccountDialog({
     setProxyUrl("");
     setProxyUsername("");
     setProxyPassword("");
-    setVerifying(false);
-    setVerified(false);
-    setDiscoveredAccountCount(0);
     setSaving(false);
     setError(null);
   }
@@ -117,12 +111,10 @@ export function AddAccountDialog({
   }
 
   function invalidateValidation() {
-    setVerified(false);
-    setDiscoveredAccountCount(0);
     setError(null);
   }
 
-  const steps = ["供应商", "凭据与出口", "账号与验证"];
+  const steps = ["供应商", "账号与凭据"];
   const providerCredentials = credentials.filter(
     (credential) => credential.provider === provider,
   );
@@ -139,7 +131,7 @@ export function AddAccountDialog({
         <Dialog className="outline-none" aria-label="添加账号">
           {({ close: closeDialog }) => (
             <FloatingGlass
-              className="account-dialog w-[460px] max-w-full p-0 overflow-hidden"
+              className="account-dialog w-[500px] max-w-full p-0 overflow-hidden"
             >
               {/* 步骤头 */}
               <div className="px-5 pt-4 pb-3 border-b border-[var(--line)]">
@@ -209,6 +201,28 @@ export function AddAccountDialog({
 
                 {step === 1 && (
                   <div className="flex flex-col gap-4">
+                    <Field label="账号标签">
+                      <TextInput
+                        placeholder="如 主账号、工作区 B"
+                        value={label}
+                        onChange={(event) => {
+                          setLabel(event.target.value);
+                          invalidateValidation();
+                        }}
+                      />
+                    </Field>
+                    {provider === "opencode-go" && (
+                      <Field label="Workspace ID（可选）">
+                        <TextInput
+                          placeholder="wrk_… 留空则自动发现全部工作区"
+                          value={scope}
+                          onChange={(event) => {
+                            setScope(event.target.value);
+                            invalidateValidation();
+                          }}
+                        />
+                      </Field>
+                    )}
                     <Field label="凭据来源">
                       <RadioGroup
                         value={credentialSource}
@@ -257,8 +271,10 @@ export function AddAccountDialog({
                           <TextAreaInput
                             placeholder={
                               provider === "clinepass"
-                                ? "粘贴 ClinePass API Key"
-                                : "粘贴完整 Cookie 请求头"
+                                ? "粘贴 API Key 或 Authorization 请求头"
+                                : provider === "opencode-go"
+                                  ? "粘贴 Cookie，或 Firefox 请求头 JSON"
+                                  : "粘贴 Ollama API Key（推荐），也兼容 Cookie"
                             }
                             value={secret}
                             onChange={(event) => {
@@ -268,7 +284,7 @@ export function AddAccountDialog({
                           />
                           <p className="text-[11px] text-ink-3 flex items-center gap-1">
                             <KeyRound size={11} />
-                            秘密仅本机保存到 Windows Credential Manager，不回显
+                            可直接粘贴浏览器请求头 JSON；应用会自动提取并仅保存凭据值
                           </p>
                         </div>
                       )}
@@ -348,97 +364,21 @@ export function AddAccountDialog({
                           />
                         </div>
                       )}
-                      {provider && provider !== "clinepass" && (
+                      {provider === "opencode-go" && (
                         <p className="text-[11px] text-ink-3 mt-2 flex items-center gap-1">
                           <Globe size={11} />
-                          建议绑定创建该网页登录会话时的出口
+                          Cookie 查询建议绑定创建该网页登录会话时的出口
                         </p>
                       )}
                     </Field>}
-                  </div>
-                )}
-
-                {step === 2 && (
-                  <div className="flex flex-col gap-4">
-                    <Field label="账号标签">
-                      <TextInput
-                        placeholder="如 工作区 B"
-                        value={label}
-                        onChange={(e) => {
-                          setLabel(e.target.value);
-                          setVerified(false);
-                        }}
-                      />
-                    </Field>
-                    {provider === "opencode-go" && (
-                      <Field label="Workspace ID（可选）">
-                        <TextInput
-                          placeholder="wrk_… 留空则自动发现全部工作区"
-                          value={scope}
-                          onChange={(e) => {
-                            setScope(e.target.value);
-                            invalidateValidation();
-                          }}
-                        />
-                      </Field>
-                    )}
-                    <Field label="连接验证">
-                      <Button
-                        className="btn btn-accent"
-                        onPress={async () => {
-                          setVerifying(true);
-                          setError(null);
-                          try {
-                            if (!provider) return;
-                            const result =
-                              credentialSource === "existing"
-                                ? await quotaClient.validateExistingCredential(
-                                    existingCredentialId,
-                                    scope.trim() || undefined,
-                                  )
-                                : await quotaClient.validateProvider({
-                                    provider,
-                                    secret,
-                                    workspaceId: scope.trim() || undefined,
-                                    route: selectedRoute(),
-                                  });
-                            setDiscoveredAccountCount(result.discoveredAccountCount);
-                            setVerified(true);
-                          } catch (reason) {
-                            setVerified(false);
-                            setError(commandErrorMessage(reason));
-                          } finally {
-                            setVerifying(false);
-                          }
-                        }}
-                        isDisabled={
-                          verifying ||
-                          verified ||
-                          !provider ||
-                          (credentialSource === "new"
-                            ? !secret.trim()
-                            : !existingCredentialId)
-                        }
-                      >
-                        {verified ? (
-                          <><Check size={14} /> 验证通过</>
-                        ) : (
-                          <>{verifying ? "验证中…" : "验证连接"}</>
-                        )}
-                      </Button>
-                      <p className="text-[11px] text-ink-3 mt-2">
-                        {verified
-                          ? provider === "opencode-go" && discoveredAccountCount > 1
-                            ? `凭据可用，发现 ${discoveredAccountCount} 个 Workspace，将分别建账`
-                            : "凭据可用，可保存账号"
-                          : "验证只读额度接口，不消耗模型额度"}
+                    {error && (
+                      <p className="text-[11px] text-[var(--danger)]" role="alert">
+                        {error}
                       </p>
-                      {error && (
-                        <p className="text-[11px] text-[var(--danger)] mt-2">
-                          {error}
-                        </p>
-                      )}
-                    </Field>
+                    )}
+                    <p className="text-[11px] text-ink-3">
+                      添加时会验证只读额度接口；不会调用模型，也不会消耗推理额度。
+                    </p>
                   </div>
                 )}
               </div>
@@ -459,16 +399,16 @@ export function AddAccountDialog({
                     (step === 0 && !provider) ||
                     (step === 1 &&
                       (credentialSource === "new"
-                        ? !credentialLabel.trim() ||
+                        ? !label.trim() ||
+                          !credentialLabel.trim() ||
                           !secret.trim() ||
                           (route === "existing" && !existingProfileId) ||
                           (route === "new" &&
                             (!proxyLabel.trim() || !proxyUrl.trim()))
-                        : !existingCredentialId)) ||
-                    (step === 2 && (!verified || !label.trim()))
+                        : !label.trim() || !existingCredentialId))
                   }
                   onPress={async () => {
-                    if (step < 2) {
+                    if (step < 1) {
                       setStep(step + 1);
                       return;
                     }
@@ -499,12 +439,12 @@ export function AddAccountDialog({
                     }
                   }}
                 >
-                  {step === 2
+                  {step === 1
                     ? saving
-                      ? "保存中…"
-                      : "保存账号"
+                      ? "验证中…"
+                      : "验证并添加"
                     : "下一步"}
-                  {step < 2 && <ArrowRight size={14} />}
+                  {step < 1 && <ArrowRight size={14} />}
                 </Button>
               </div>
             </FloatingGlass>

@@ -11,10 +11,10 @@
 :root {
   color-scheme: light;
 
-  --canvas: #e8e8e4;
-  --canvas-deep: #d8dbd8;
-  --stage: rgba(248, 248, 245, 0.9);
-  --stage-solid: #f4f4f1;
+  --canvas: #e8edf0;
+  --canvas-deep: #ccd6d9;
+  --stage: rgba(247, 249, 248, 0.84);
+  --stage-solid: #f4f6f5;
 
   --ink-1: #171817;
   --ink-2: #515552;
@@ -54,7 +54,7 @@
   --provider-opencode: #354e69;
   --provider-ollama: #3f5e59;
 
-  --stable-bg: rgba(255, 255, 253, 0.92);
+  --stable-bg: rgba(255, 255, 254, 0.88);
   --stable-solid: #fffefd;
   --stable-border: rgba(255, 255, 255, 0.82);
   --stable-outline: rgba(36, 42, 38, 0.105);
@@ -62,12 +62,12 @@
     0 1px 1px rgba(30, 37, 32, 0.04),
     0 10px 28px rgba(39, 48, 42, 0.065);
 
-  --control-bg: rgba(250, 250, 247, 0.42);
+  --control-bg: rgba(248, 251, 250, 0.38);
   --control-solid: #eeefeb;
   --control-border: rgba(255, 255, 255, 0.75);
   --control-outline: rgba(35, 42, 37, 0.13);
 
-  --floating-bg: rgba(252, 252, 249, 0.7);
+  --floating-bg: rgba(249, 251, 250, 0.66);
   --floating-solid: #f8f8f5;
   --floating-border: rgba(255, 255, 255, 0.88);
   --floating-outline: rgba(30, 37, 32, 0.16);
@@ -77,8 +77,8 @@
 
   --r-sm: 8px;
   --r-md: 11px;
-  --r-lg: 16px;
-  --r-xl: 22px;
+  --r-lg: 18px;
+  --r-xl: 24px;
 
   --dur-fast: 110ms;
   --dur-med: 190ms;
@@ -231,30 +231,42 @@ body {
 .app-shell {
   position: relative;
   isolation: isolate;
-  gap: 12px;
-  padding: 14px;
+  gap: 11px;
+  padding: 13px;
   overflow: hidden;
   background:
-    radial-gradient(700px 520px at -4% 104%, rgba(218, 155, 123, 0.46), transparent 66%),
-    radial-gradient(680px 480px at 105% -8%, rgba(115, 178, 171, 0.42), transparent 68%),
-    radial-gradient(780px 520px at 52% -22%, rgba(151, 166, 197, 0.34), transparent 70%),
-    linear-gradient(145deg, var(--canvas), var(--canvas-deep));
+    radial-gradient(780px 590px at -7% 110%, rgba(238, 180, 147, 0.52), transparent 67%),
+    radial-gradient(740px 520px at 108% -12%, rgba(117, 190, 184, 0.5), transparent 68%),
+    radial-gradient(700px 480px at 42% -20%, rgba(153, 179, 219, 0.48), transparent 70%),
+    linear-gradient(142deg, var(--canvas), var(--canvas-deep));
 }
 
 .app-shell::before {
   content: "";
   position: absolute;
   z-index: -1;
-  width: 440px;
-  height: 440px;
-  right: -170px;
-  top: 19%;
-  border: 52px solid rgba(255, 255, 255, 0.13);
-  border-radius: 48% 52% 46% 54%;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 0 90px rgba(55, 105, 99, 0.1);
-  transform: rotate(-19deg);
+  width: 68vw;
+  height: 42vh;
+  right: -18vw;
+  top: 12vh;
+  border-radius: 50%;
+  background:
+    linear-gradient(112deg, transparent 22%, rgba(255, 255, 255, 0.42) 48%, transparent 72%);
+  filter: blur(48px);
+  transform: rotate(-13deg);
+  opacity: 0.72;
+}
+
+.app-shell::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(124deg, rgba(255, 255, 255, 0.26), transparent 32%),
+    radial-gradient(400px 220px at 70% 82%, rgba(255, 255, 255, 0.2), transparent 72%);
+  mix-blend-mode: soft-light;
 }
 
 :root[data-theme="dark"] .app-shell {
@@ -273,13 +285,14 @@ body {
   background: var(--control-bg);
   box-shadow:
     inset 0 1px 0 var(--control-border),
-    inset 1px 0 0 rgba(255, 255, 255, 0.22),
-    0 18px 44px rgba(39, 48, 42, 0.12);
+    inset 1px 0 0 rgba(255, 255, 255, 0.28),
+    inset -1px 0 0 rgba(255, 255, 255, 0.12),
+    0 22px 54px rgba(35, 49, 43, 0.14);
   backdrop-filter:
     url("#liquid-panel-refraction")
-    blur(26px)
-    saturate(1.15);
-  -webkit-backdrop-filter: blur(26px) saturate(1.15);
+    blur(34px)
+    saturate(1.28);
+  -webkit-backdrop-filter: blur(34px) saturate(1.28);
 }
 
 .app-sidebar::after {
@@ -308,12 +321,15 @@ body {
 .workspace-stage {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.64);
   border-radius: var(--r-xl);
   background: var(--stage);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 18px 48px rgba(37, 44, 40, 0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 1px 0 0 rgba(255, 255, 255, 0.34),
+    0 22px 58px rgba(37, 49, 43, 0.13);
+  backdrop-filter: blur(24px) saturate(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(1.08);
 }
 
 .workspace-stage::before {
@@ -331,7 +347,7 @@ body {
   position: relative;
   z-index: 2;
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(250, 250, 247, 0.54);
+  background: rgba(250, 252, 251, 0.42);
   backdrop-filter: blur(20px) saturate(1.05);
   -webkit-backdrop-filter: blur(20px) saturate(1.05);
 }
@@ -370,6 +386,7 @@ body {
   background: var(--stable-bg);
   box-shadow:
     inset 0 1px 0 var(--stable-border),
+    inset 0 -1px 0 rgba(45, 58, 50, 0.025),
     var(--stable-shadow);
 }
 
@@ -539,11 +556,41 @@ body {
 }
 
 .btn-icon {
+  position: relative;
   width: 30px;
   height: 30px;
   padding: 0;
   border-radius: 10px;
   color: var(--ink-2);
+}
+
+.btn-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 8;
+  right: 0;
+  bottom: calc(100% + 5px);
+  width: max-content;
+  max-width: 180px;
+  padding: 5px 7px;
+  border: 1px solid var(--floating-outline);
+  border-radius: 7px;
+  color: var(--ink-1);
+  background: var(--floating-solid);
+  box-shadow: 0 5px 16px rgba(24, 33, 28, 0.16);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+
+.btn-icon[data-tooltip]:hover::after,
+.btn-icon[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .btn-icon[data-hovered] {
@@ -598,9 +645,20 @@ body {
   position: relative;
   flex: none;
   border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, currentColor 6%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), color-mix(in srgb, currentColor 7%, transparent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 3px 9px color-mix(in srgb, currentColor 11%, transparent);
+}
+
+:root[data-theme="dark"] .provider-mark {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.13), color-mix(in srgb, currentColor 9%, transparent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 3px 10px rgba(0, 0, 0, 0.2);
 }
 
 .badge {
@@ -636,9 +694,14 @@ body {
 .summary-board {
   min-height: 64px;
   overflow: hidden;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 253, 0.38);
+  border: 1px solid var(--control-outline);
+  border-radius: 16px;
+  background: rgba(250, 252, 251, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 8px 24px rgba(35, 48, 41, 0.05);
+  backdrop-filter: blur(18px) saturate(1.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
 }
 
 :root[data-theme="dark"] .summary-board {
@@ -670,6 +733,8 @@ body {
 .quota-card {
   min-height: 312px;
   overflow: hidden;
+  backdrop-filter: blur(10px) saturate(1.03);
+  -webkit-backdrop-filter: blur(10px) saturate(1.03);
 }
 
 .quota-card:hover {
@@ -785,7 +850,11 @@ input:checked ~ .toggle-thumb {
 }
 
 .account-dialog {
-  border-radius: 20px;
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 2px 7px rgba(22, 31, 26, 0.1),
+    0 38px 110px rgba(24, 35, 29, 0.28);
 }
 
 .account-dialog input,
