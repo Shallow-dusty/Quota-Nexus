@@ -6,6 +6,7 @@ mod error;
 mod network;
 mod ollama;
 mod opencode;
+mod scheduler;
 mod storage;
 
 use tauri::Manager;
@@ -57,11 +58,19 @@ pub mod local_import {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             let db_path = app_data_dir.join("ai-quota-monitor.sqlite3");
             let db = tauri::async_runtime::block_on(storage::open(&db_path))?;
+            scheduler::spawn(app.handle().clone(), db.clone());
             app.manage(commands::AppState { db });
             Ok(())
         })
@@ -69,8 +78,15 @@ pub fn run() {
             commands::get_overview,
             commands::get_connections,
             commands::get_network_profiles,
+            commands::get_credentials,
+            commands::get_settings,
+            commands::update_settings,
+            commands::get_provider_health,
             commands::validate_provider,
+            commands::validate_existing_credential,
             commands::create_provider_account,
+            commands::update_credential,
+            commands::update_account,
             commands::refresh_all,
             commands::refresh_account,
         ])

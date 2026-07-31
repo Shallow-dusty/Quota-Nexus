@@ -64,6 +64,9 @@ pub async fn discover_workspaces(
         .await
         .map_err(|_| CommandError::network("无法连接 OpenCode Go Workspace 服务"))?;
 
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        return Err(crate::network::rate_limit_error(response.headers()));
+    }
     if matches!(
         response.status(),
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
@@ -115,6 +118,9 @@ pub async fn fetch_workspace(
         .send()
         .await
         .map_err(|_| CommandError::network("无法连接 OpenCode Go 用量页"))?;
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        return Err(crate::network::rate_limit_error(response.headers()));
+    }
     if matches!(
         response.status(),
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN

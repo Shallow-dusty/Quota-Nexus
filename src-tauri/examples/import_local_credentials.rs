@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             account_label: "Cline Pass".into(),
             credential_label: "导入 · Cline Pass · 1".into(),
             secret: value.api_key.clone(),
+            existing_credential_id: None,
             workspace_id: None,
             route: route(&primary, value.network_profile.as_deref())?,
         });
@@ -69,6 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             account_label: "Ollama Cloud".into(),
             credential_label: "导入 · Ollama Cloud · 1".into(),
             secret: value.cookie.clone(),
+            existing_credential_id: None,
             workspace_id: None,
             route: route(&primary, value.network_profile.as_deref())?,
         });
@@ -110,6 +112,7 @@ fn open_code_request(
         account_label: format!("OpenCode Go · {index}"),
         credential_label: format!("导入 · OpenCode Go · {index}"),
         secret: value.cookie.clone(),
+        existing_credential_id: None,
         workspace_id: non_empty(&value.workspace_id),
         route: route(source, value.network_profile.as_deref())?,
     })

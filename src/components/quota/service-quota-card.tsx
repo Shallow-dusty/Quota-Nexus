@@ -49,7 +49,7 @@ export function ServiceQuotaCard({
         <ProviderMark provider={account.provider} size={32} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-[14px] font-semibold text-ink-1 truncate">
+            <h3 className="privacy-sensitive text-[14px] font-semibold text-ink-1 truncate">
               {account.accountLabel}
             </h3>
             {account.plan && <PlanBadge plan={account.plan} />}

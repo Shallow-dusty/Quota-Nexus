@@ -5,6 +5,8 @@ use serde::Serialize;
 pub struct CommandError {
     pub code: &'static str,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_after_seconds: Option<u64>,
 }
 
 impl CommandError {
@@ -12,6 +14,7 @@ impl CommandError {
         Self {
             code: "validation",
             message: message.into(),
+            retry_after_seconds: None,
         }
     }
 
@@ -19,6 +22,7 @@ impl CommandError {
         Self {
             code: "auth",
             message: "供应商凭据无效或已失效".into(),
+            retry_after_seconds: None,
         }
     }
 
@@ -26,6 +30,7 @@ impl CommandError {
         Self {
             code: "network",
             message: message.into(),
+            retry_after_seconds: None,
         }
     }
 
@@ -33,6 +38,7 @@ impl CommandError {
         Self {
             code: "parser",
             message: message.into(),
+            retry_after_seconds: None,
         }
     }
 
@@ -40,6 +46,7 @@ impl CommandError {
         Self {
             code: "proxy",
             message: message.into(),
+            retry_after_seconds: None,
         }
     }
 
@@ -47,6 +54,15 @@ impl CommandError {
         Self {
             code: "storage",
             message: message.into(),
+            retry_after_seconds: None,
+        }
+    }
+
+    pub fn rate_limit(retry_after_seconds: Option<u64>) -> Self {
+        Self {
+            code: "rate_limit",
+            message: "供应商请求频率受限，将按计划稍后重试".into(),
+            retry_after_seconds,
         }
     }
 
@@ -55,6 +71,7 @@ impl CommandError {
             "auth" => "auth",
             "parser" => "parser",
             "proxy" => "proxy",
+            "rate_limit" => "network",
             _ => "network",
         }
     }

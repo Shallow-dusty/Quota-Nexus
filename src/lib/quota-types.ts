@@ -66,12 +66,17 @@ export interface AccountConnectionView {
   plan?: string;
   scopeLabel?: string;
   credentialLabel: string;
+  credentialId: string;
   sharedAccountCount: number;
   routeModeLabel: string;
   state: DataState;
   freshness: "fresh" | "stale";
   lastSuccessAt: string | null;
   nextRefreshAt: string | null;
+  nextAttemptAt: string | null;
+  effectiveRefreshMinutes: number | null;
+  consecutiveFailures: number;
+  authPaused: boolean;
   enabled: boolean;
   errorCategory?: ErrorCategory;
 }
@@ -91,4 +96,28 @@ export interface NetworkProfileView {
   label: string;
   endpointLabel: string;
   hasAuth: boolean;
+}
+
+export interface CredentialOptionView {
+  id: string;
+  provider: ProviderKind;
+  label: string;
+  sharedAccountCount: number;
+  routeModeLabel: string;
+  lastValidatedAt: string | null;
+}
+
+export interface AppSettingsView {
+  refreshIntervalMinutes: 5 | 15 | 30 | null;
+  adaptiveRefresh: boolean;
+  warningThreshold: number;
+  highThreshold: number;
+  criticalThreshold: number;
+  historyDays: 7 | 30 | 90 | null;
+  trayEnabled: boolean;
+  autostartEnabled: boolean;
+  privacyMode: boolean;
+  notifyAuth: boolean;
+  notifyStale: boolean;
+  notifyRecovery: boolean;
 }

@@ -36,6 +36,9 @@ pub async fn fetch(client: &Client, api_key: &str) -> Result<Vec<QuotaWindowView
         .await
         .map_err(|_| CommandError::network("无法连接 Cline Pass 额度服务，请检查当前 TUN/网络"))?;
 
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        return Err(crate::network::rate_limit_error(response.headers()));
+    }
     if matches!(
         response.status(),
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN

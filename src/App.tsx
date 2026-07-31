@@ -17,6 +17,10 @@ export function App() {
     document.documentElement.dataset.transparency = off ? "off" : "on";
   }
 
+  function applyPrivacy(enabled: boolean) {
+    document.documentElement.dataset.privacy = enabled ? "on" : "off";
+  }
+
   return (
     <AppShell
       page={page}
@@ -32,6 +36,7 @@ export function App() {
           onThemeChange={setTheme}
           transparencyOff={transparencyOff}
           onTransparencyChange={applyTransparency}
+          onPrivacyChange={applyPrivacy}
         />
       )}
     </AppShell>

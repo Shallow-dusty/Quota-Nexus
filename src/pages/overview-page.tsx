@@ -45,6 +45,26 @@ export function OverviewPage({
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void quotaClient
+      .onOverviewUpdated((data) => {
+        if (!active) return;
+        setAccounts(data.accounts);
+        setRefreshedAt(data.refreshedAt);
+        setSource(data.source);
+      })
+      .then((dispose) => {
+        if (active) unlisten = dispose;
+        else dispose();
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
+
   const visible = useMemo(() => {
     if (!accounts) return [];
     const filtered = accounts.filter((a) => {

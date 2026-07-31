@@ -1,6 +1,6 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
-use reqwest::{redirect::Policy, Client, Proxy};
+use reqwest::{header::HeaderMap, redirect::Policy, Client, Proxy};
 use url::Url;
 
 use crate::{credential::ProxyAuth, error::CommandError, storage::NetworkProfileRecord};
@@ -118,6 +118,21 @@ fn build(endpoint: Option<&str>, auth: Option<&ProxyAuth>) -> Result<Client, Com
     builder
         .build()
         .map_err(|_| CommandError::network("无法初始化额度查询网络客户端"))
+}
+
+pub fn rate_limit_error(headers: &HeaderMap) -> CommandError {
+    let retry_after_seconds = headers
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| {
+            value.parse::<u64>().ok().or_else(|| {
+                httpdate::parse_http_date(value)
+                    .ok()
+                    .and_then(|when| when.duration_since(SystemTime::now()).ok())
+                    .map(|duration| duration.as_secs())
+            })
+        });
+    CommandError::rate_limit(retry_after_seconds)
 }
 
 #[cfg(test)]

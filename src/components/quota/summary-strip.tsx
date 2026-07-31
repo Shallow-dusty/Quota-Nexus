@@ -55,7 +55,7 @@ export function SummaryStrip({
               </strong>
               <span className="text-ink-3">
                 {" "}
-                · {highest.account.accountLabel}·{highest.window.label}
+                · <span className="privacy-sensitive">{highest.account.accountLabel}</span>·{highest.window.label}
               </span>
             </span>
           ) : (
@@ -74,7 +74,7 @@ export function SummaryStrip({
               </span>
               <span className="text-ink-3">
                 {" "}
-                · {nearest.account.accountLabel}
+                · <span className="privacy-sensitive">{nearest.account.accountLabel}</span>
               </span>
             </span>
           ) : (

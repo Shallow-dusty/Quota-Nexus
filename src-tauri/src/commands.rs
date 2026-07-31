@@ -1,14 +1,20 @@
+use std::{collections::HashMap, sync::Arc};
+
+use futures::{stream, StreamExt};
 use reqwest::Client;
 use sqlx::SqlitePool;
 use tauri::State;
+use tokio::sync::Semaphore;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use crate::{
     clinepass, credential,
     domain::{
-        AccountConnectionView, CreateProviderAccountInput, NetworkProfileView, OverviewView,
-        ProviderValidationView, RouteSelectionInput, ValidateProviderInput,
+        AccountConnectionView, AppSettingsView, CreateProviderAccountInput, CredentialOptionView,
+        NetworkProfileView, OverviewView, ProviderHealthView, ProviderValidationView,
+        RouteSelectionInput, UpdateAccountInput, UpdateCredentialInput, UpdateSettingsInput,
+        ValidateProviderInput,
     },
     error::CommandError,
     network::{self, NewNetworkProfile},
@@ -53,6 +59,33 @@ pub async fn get_network_profiles(
 }
 
 #[tauri::command]
+pub async fn get_credentials(
+    state: State<'_, AppState>,
+) -> Result<Vec<CredentialOptionView>, CommandError> {
+    storage::credential_options(&state.db).await
+}
+
+#[tauri::command]
+pub async fn get_settings(state: State<'_, AppState>) -> Result<AppSettingsView, CommandError> {
+    storage::settings(&state.db).await
+}
+
+#[tauri::command]
+pub async fn update_settings(
+    state: State<'_, AppState>,
+    input: UpdateSettingsInput,
+) -> Result<AppSettingsView, CommandError> {
+    storage::update_settings(&state.db, input).await
+}
+
+#[tauri::command]
+pub async fn get_provider_health(
+    state: State<'_, AppState>,
+) -> Result<Vec<ProviderHealthView>, CommandError> {
+    storage::provider_health(&state.db).await
+}
+
+#[tauri::command]
 pub async fn validate_provider(
     state: State<'_, AppState>,
     input: ValidateProviderInput,
@@ -72,6 +105,20 @@ pub async fn validate_provider(
 }
 
 #[tauri::command]
+pub async fn validate_existing_credential(
+    state: State<'_, AppState>,
+    credential_id: String,
+    workspace_id: Option<String>,
+) -> Result<ProviderValidationView, CommandError> {
+    let context = storage::credential_context(&state.db, credential_id.trim()).await?;
+    let secret = credential::load(&context.id)?;
+    let client = client_for_credential(&context)?;
+    let result =
+        fetch_provider(&context.provider, &client, &secret, workspace_id.as_deref()).await?;
+    Ok(validation_view(result))
+}
+
+#[tauri::command]
 pub async fn create_provider_account(
     state: State<'_, AppState>,
     input: CreateProviderAccountInput,
@@ -85,6 +132,30 @@ pub(crate) async fn create_provider_account_core(
 ) -> Result<Vec<AccountConnectionView>, CommandError> {
     validate_provider_name(&input.provider)?;
     let account_label = validated_label(input.account_label, "账号标签")?;
+    if let Some(credential_id) = input
+        .existing_credential_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let context = storage::credential_context(db, credential_id).await?;
+        if context.provider != input.provider {
+            return Err(CommandError::validation("已有凭据与所选供应商不匹配"));
+        }
+        let secret = credential::load(&context.id)?;
+        let client = client_for_credential(&context)?;
+        let payload = fetch_provider(
+            &input.provider,
+            &client,
+            &secret,
+            input.workspace_id.as_deref(),
+        )
+        .await?;
+        let accounts = account_records(&account_label, payload);
+        storage::insert_accounts_for_credential(db, &context.id, &input.provider, &accounts)
+            .await?;
+        return storage::connections(db).await;
+    }
     let credential_label = validated_label(input.credential_label, "凭据标签")?;
     let secret = validated_secret(input.secret)?;
     let route = resolve_route(db, input.route).await?;
@@ -133,8 +204,46 @@ pub(crate) async fn create_provider_account_core(
 }
 
 #[tauri::command]
+pub async fn update_credential(
+    state: State<'_, AppState>,
+    input: UpdateCredentialInput,
+) -> Result<Vec<AccountConnectionView>, CommandError> {
+    let credential_id = input.credential_id.trim();
+    if credential_id.is_empty() {
+        return Err(CommandError::validation("请选择要更新的凭据"));
+    }
+    let secret = validated_secret(input.secret)?;
+    let context = storage::credential_context(&state.db, credential_id).await?;
+    let client = client_for_credential(&context)?;
+    fetch_provider(
+        &context.provider,
+        &client,
+        &secret,
+        context.scope_id.as_deref(),
+    )
+    .await?;
+    let old_secret = credential::load(credential_id)?;
+    credential::store(credential_id, &secret)?;
+    if let Err(error) = storage::mark_credential_updated(&state.db, credential_id).await {
+        let _ = credential::store(credential_id, &old_secret);
+        return Err(error);
+    }
+    storage::connections(&state.db).await
+}
+
+#[tauri::command]
+pub async fn update_account(
+    state: State<'_, AppState>,
+    input: UpdateAccountInput,
+) -> Result<Vec<AccountConnectionView>, CommandError> {
+    let label = validated_label(input.label, "账号标签")?;
+    storage::update_account(&state.db, &input.id, &label, input.enabled).await?;
+    storage::connections(&state.db).await
+}
+
+#[tauri::command]
 pub async fn refresh_all(state: State<'_, AppState>) -> Result<OverviewView, CommandError> {
-    refresh(&state.db, None).await
+    refresh(&state.db, None, true).await.map(|result| result.0)
 }
 
 #[tauri::command]
@@ -142,73 +251,107 @@ pub async fn refresh_account(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<OverviewView, CommandError> {
-    refresh(&state.db, Some(id.as_str())).await
+    refresh(&state.db, Some(id.as_str()), true)
+        .await
+        .map(|result| result.0)
+}
+
+pub(crate) async fn scheduled_refresh(
+    pool: &SqlitePool,
+) -> Result<Option<OverviewView>, CommandError> {
+    let (overview, refreshed) = refresh(pool, None, false).await?;
+    Ok((refreshed > 0).then_some(overview))
 }
 
 async fn refresh(
     pool: &SqlitePool,
     account_id: Option<&str>,
-) -> Result<OverviewView, CommandError> {
-    let targets = storage::refresh_targets(pool, account_id).await?;
+    manual: bool,
+) -> Result<(OverviewView, usize), CommandError> {
+    let targets = storage::refresh_targets(pool, account_id, manual).await?;
     if account_id.is_some() && targets.is_empty() {
-        return Err(CommandError::validation("找不到可刷新的账号"));
+        return Err(CommandError::validation(
+            "账号已暂停、凭据失效、处于熔断期或不存在",
+        ));
     }
+    let count = targets.len();
+    let pool = pool.clone();
+    let provider_limits = Arc::new(HashMap::from([
+        ("clinepass".to_string(), Arc::new(Semaphore::new(2))),
+        ("opencode-go".to_string(), Arc::new(Semaphore::new(2))),
+        ("ollama-cloud".to_string(), Arc::new(Semaphore::new(2))),
+    ]));
+    let results = stream::iter(targets.into_iter().map(|target| {
+        let pool = pool.clone();
+        let semaphore = provider_limits
+            .get(&target.provider)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(Semaphore::new(1)));
+        async move {
+            let _permit = semaphore
+                .acquire_owned()
+                .await
+                .map_err(|_| CommandError::network("刷新并发控制器已关闭"))?;
+            refresh_target(&pool, target).await
+        }
+    }))
+    .buffer_unordered(4)
+    .collect::<Vec<_>>()
+    .await;
+    for result in results {
+        result?;
+    }
+    Ok((storage::overview(&pool).await?, count))
+}
 
-    for target in targets {
-        let secret = match credential::load(&target.credential_id) {
-            Ok(secret) => secret,
-            Err(_) => {
-                storage::update_failure(pool, &target.id, "auth").await?;
-                continue;
-            }
-        };
-        let explicit = target.network_profile_id.is_some();
-        let client = match client_for_target(&target) {
-            Ok(client) => client,
-            Err(_) => {
-                storage::update_failure(pool, &target.id, "proxy").await?;
-                continue;
-            }
-        };
-
-        let result: Result<(Option<String>, Vec<crate::domain::QuotaWindowView>), CommandError> =
-            match target.provider.as_str() {
-                "clinepass" => clinepass::fetch(&client, &secret)
+async fn refresh_target(
+    pool: &SqlitePool,
+    target: storage::RefreshTarget,
+) -> Result<(), CommandError> {
+    let explicit = target.network_profile_id.is_some();
+    let secret = match credential::load(&target.credential_id) {
+        Ok(secret) => secret,
+        Err(_) => {
+            storage::update_failure(pool, &target, &CommandError::auth(), explicit).await?;
+            return Ok(());
+        }
+    };
+    let client = match client_for_target(&target) {
+        Ok(client) => client,
+        Err(error) => {
+            storage::update_failure(pool, &target, &error, explicit).await?;
+            return Ok(());
+        }
+    };
+    let result: Result<(Option<String>, Vec<crate::domain::QuotaWindowView>), CommandError> =
+        match target.provider.as_str() {
+            "clinepass" => clinepass::fetch(&client, &secret)
+                .await
+                .map(|windows| (None, windows)),
+            "ollama-cloud" => ollama::fetch(&client, &secret)
+                .await
+                .map(|quota| (quota.plan, quota.windows)),
+            "opencode-go" => match target.scope_id.as_deref() {
+                Some(workspace_id) => opencode::fetch_workspace(&client, &secret, workspace_id)
                     .await
                     .map(|windows| (None, windows)),
-                "ollama-cloud" => ollama::fetch(&client, &secret)
-                    .await
-                    .map(|quota| (quota.plan, quota.windows)),
-                "opencode-go" => match target.scope_id.as_deref() {
-                    Some(workspace_id) => opencode::fetch_workspace(&client, &secret, workspace_id)
-                        .await
-                        .map(|windows| (None, windows)),
-                    None => Err(CommandError::parser("OpenCode Go 账号缺少 Workspace ID")),
-                },
-                _ => Err(CommandError::parser("未知供应商")),
-            };
-        match result {
-            Ok((plan, windows)) => {
-                storage::update_success(
-                    pool,
-                    &target.id,
-                    &target.credential_id,
-                    plan.as_deref(),
-                    &windows,
-                )
-                .await?;
-            }
-            Err(error) => {
-                let category = if explicit && error.code == "network" {
-                    "proxy"
-                } else {
-                    error.category()
-                };
-                storage::update_failure(pool, &target.id, category).await?;
-            }
+                None => Err(CommandError::parser("OpenCode Go 账号缺少 Workspace ID")),
+            },
+            _ => Err(CommandError::parser("未知供应商")),
+        };
+    match result {
+        Ok((plan, windows)) => {
+            storage::update_success(
+                pool,
+                &target.id,
+                &target.credential_id,
+                plan.as_deref(),
+                &windows,
+            )
+            .await
         }
+        Err(error) => storage::update_failure(pool, &target, &error, explicit).await,
     }
-    storage::overview(pool).await
 }
 
 async fn resolve_route(
@@ -269,6 +412,20 @@ async fn resolve_route(
 
 fn client_for_target(target: &storage::RefreshTarget) -> Result<Client, CommandError> {
     match target.network_profile() {
+        Some(profile) => {
+            let auth = if profile.has_auth {
+                Some(credential::load_proxy_auth(&profile.id)?)
+            } else {
+                None
+            };
+            network::build_profile_client(&profile, auth.as_ref())
+        }
+        None => network::build_default_client(),
+    }
+}
+
+fn client_for_credential(context: &storage::CredentialContext) -> Result<Client, CommandError> {
+    match context.network_profile() {
         Some(profile) => {
             let auth = if profile.has_auth {
                 Some(credential::load_proxy_auth(&profile.id)?)

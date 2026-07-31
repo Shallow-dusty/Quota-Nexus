@@ -962,3 +962,9 @@ input:checked ~ .toggle-thumb {
     padding: 8px 10px;
   }
 }
+
+:root[data-privacy="on"] .privacy-sensitive {
+  color: transparent !important;
+  text-shadow: 0 0 8px var(--ink-2);
+  user-select: none;
+}

@@ -27,6 +27,9 @@ pub async fn fetch(client: &Client, cookie: &str) -> Result<OllamaQuota, Command
         .await
         .map_err(|_| CommandError::network("无法连接 Ollama Cloud，请检查当前网络出口"))?;
 
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        return Err(crate::network::rate_limit_error(response.headers()));
+    }
     if response.status().is_redirection() {
         let location = response
             .headers()

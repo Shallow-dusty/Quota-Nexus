@@ -6,7 +6,11 @@ import {
   quotaClient,
   type RouteSelectionInput,
 } from "../../lib/quota-client";
-import type { AccountConnectionView, NetworkProfileView } from "../../lib/quota-types";
+import type {
+  AccountConnectionView,
+  CredentialOptionView,
+  NetworkProfileView,
+} from "../../lib/quota-types";
 import type { ProviderKind } from "../../lib/quota-types";
 import { FloatingGlass } from "../ui/surface";
 import { ProviderMark } from "./provider-mark";
@@ -35,6 +39,8 @@ export function AddAccountDialog({
   const [credentialLabel, setCredentialLabel] = useState("");
   const [secret, setSecret] = useState("");
   const [networkProfiles, setNetworkProfiles] = useState<NetworkProfileView[]>([]);
+  const [credentials, setCredentials] = useState<CredentialOptionView[]>([]);
+  const [existingCredentialId, setExistingCredentialId] = useState("");
   const [existingProfileId, setExistingProfileId] = useState("");
   const [proxyLabel, setProxyLabel] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
@@ -56,6 +62,7 @@ export function AddAccountDialog({
     setCredentialLabel("");
     setSecret("");
     setExistingProfileId("");
+    setExistingCredentialId("");
     setProxyLabel("");
     setProxyUrl("");
     setProxyUsername("");
@@ -75,11 +82,14 @@ export function AddAccountDialog({
   useEffect(() => {
     if (!open) return;
     let active = true;
-    quotaClient
-      .getNetworkProfiles()
-      .then((profiles) => {
+    Promise.all([
+      quotaClient.getNetworkProfiles(),
+      quotaClient.getCredentials(),
+    ])
+      .then(([profiles, credentialOptions]) => {
         if (!active) return;
         setNetworkProfiles(profiles);
+        setCredentials(credentialOptions);
         setExistingProfileId((current) => current || profiles[0]?.id || "");
       })
       .catch((reason) => {
@@ -113,6 +123,9 @@ export function AddAccountDialog({
   }
 
   const steps = ["供应商", "凭据与出口", "账号与验证"];
+  const providerCredentials = credentials.filter(
+    (credential) => credential.provider === provider,
+  );
 
   return (
     <ModalOverlay
@@ -161,6 +174,13 @@ export function AddAccountDialog({
                         type="button"
                         onClick={() => {
                           setProvider(p.id);
+                          const firstCredential = credentials.find(
+                            (credential) => credential.provider === p.id,
+                          );
+                          setExistingCredentialId(firstCredential?.id ?? "");
+                          if (!firstCredential && credentialSource === "existing") {
+                            setCredentialSource("new");
+                          }
                           invalidateValidation();
                         }}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-md)] text-left transition-colors"
@@ -196,12 +216,28 @@ export function AddAccountDialog({
                         options={[
                           {
                             id: "existing",
-                            label: "使用已有凭据（下一切片）",
-                            disabled: true,
+                            label: "使用已有凭据",
+                            disabled: providerCredentials.length === 0,
                           },
                           { id: "new", label: "新建凭据（填写标签与秘密）" },
                         ]}
                       />
+                      {credentialSource === "existing" && (
+                        <select
+                          value={existingCredentialId}
+                          onChange={(event) => {
+                            setExistingCredentialId(event.target.value);
+                            invalidateValidation();
+                          }}
+                          className="mt-2 px-2.5 h-8 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[var(--surface-raised)] border border-[var(--line)] outline-none focus:border-[var(--accent)]"
+                        >
+                          {providerCredentials.map((credential) => (
+                            <option key={credential.id} value={credential.id}>
+                              {credential.label} · {credential.routeModeLabel}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {credentialSource === "new" && (
                         <div className="flex flex-col gap-2 mt-2">
                           <TextInput
@@ -238,7 +274,7 @@ export function AddAccountDialog({
                       )}
                     </Field>
 
-                    <Field label="网络出口">
+                    {credentialSource === "new" && <Field label="网络出口">
                       <RadioGroup
                         value={route}
                         onChange={(next) => {
@@ -318,7 +354,7 @@ export function AddAccountDialog({
                           建议绑定创建该网页登录会话时的出口
                         </p>
                       )}
-                    </Field>
+                    </Field>}
                   </div>
                 )}
 
@@ -354,12 +390,18 @@ export function AddAccountDialog({
                           setError(null);
                           try {
                             if (!provider) return;
-                            const result = await quotaClient.validateProvider({
-                              provider,
-                              secret,
-                              workspaceId: scope.trim() || undefined,
-                              route: selectedRoute(),
-                            });
+                            const result =
+                              credentialSource === "existing"
+                                ? await quotaClient.validateExistingCredential(
+                                    existingCredentialId,
+                                    scope.trim() || undefined,
+                                  )
+                                : await quotaClient.validateProvider({
+                                    provider,
+                                    secret,
+                                    workspaceId: scope.trim() || undefined,
+                                    route: selectedRoute(),
+                                  });
                             setDiscoveredAccountCount(result.discoveredAccountCount);
                             setVerified(true);
                           } catch (reason) {
@@ -373,8 +415,9 @@ export function AddAccountDialog({
                           verifying ||
                           verified ||
                           !provider ||
-                          credentialSource !== "new" ||
-                          !secret.trim()
+                          (credentialSource === "new"
+                            ? !secret.trim()
+                            : !existingCredentialId)
                         }
                       >
                         {verified ? (
@@ -415,12 +458,13 @@ export function AddAccountDialog({
                     saving ||
                     (step === 0 && !provider) ||
                     (step === 1 &&
-                      (credentialSource !== "new" ||
-                        !credentialLabel.trim() ||
-                        !secret.trim() ||
-                        (route === "existing" && !existingProfileId) ||
-                        (route === "new" &&
-                          (!proxyLabel.trim() || !proxyUrl.trim())))) ||
+                      (credentialSource === "new"
+                        ? !credentialLabel.trim() ||
+                          !secret.trim() ||
+                          (route === "existing" && !existingProfileId) ||
+                          (route === "new" &&
+                            (!proxyLabel.trim() || !proxyUrl.trim()))
+                        : !existingCredentialId)) ||
                     (step === 2 && (!verified || !label.trim()))
                   }
                   onPress={async () => {
@@ -438,6 +482,10 @@ export function AddAccountDialog({
                           accountLabel: label,
                           credentialLabel,
                           secret,
+                          existingCredentialId:
+                            credentialSource === "existing"
+                              ? existingCredentialId
+                              : undefined,
                           workspaceId: scope.trim() || undefined,
                           route: selectedRoute(),
                         });
