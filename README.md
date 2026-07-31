@@ -4,6 +4,17 @@ AI Quota Monitor 是一个 Windows 优先的本地额度面板，用同一套界
 Ollama Cloud 和 ClinePass 账号。当前版本聚焦额度采集、历史、告警和账号健康；架构保留继续
 扩展账号操作、客户端联动或请求路由的空间。
 
+![AI Quota Monitor 概览](docs/images/overview-light.png)
+
+## 下载
+
+在 [GitHub Releases](https://github.com/Shallow-dusty/ai-quota-monitor/releases/latest) 下载
+`AI-Quota-Monitor_*_Windows_x64_Installer_UNSIGNED.exe`，并用同一 Release 中的
+`checksums.txt` 核对 SHA-256。
+
+当前 Windows 安装器尚未进行发布者代码签名，因此文件名明确标注 `UNSIGNED`，首次运行可能
+出现 Windows SmartScreen 提示。请只从本仓库 Release 下载；后续签名版本会作为新版本发布。
+
 ## 当前版本
 
 功能型 MVP 已完成：
@@ -48,8 +59,8 @@ pnpm desktop:dev
 pnpm desktop:build
 ```
 
-`pnpm desktop:build` 生成 Windows NSIS 安装包。当前本机构建用于开发和内部使用，并生成
-SHA-256 校验文件；公开分发前仍需配置发布者代码签名证书。
+`pnpm desktop:build` 生成 Windows NSIS 安装包和 SHA-256 校验文件。公开的未签名包必须在
+文件名和 Release 说明中标注 `UNSIGNED`；配置发布者证书后再发布新的签名版本。
 
 本地数据位于 `%APPDATA%\com.aiquotamonitor.desktop\`。卸载与彻底清理方法见
 [docs/SECURITY.md](docs/SECURITY.md)。
