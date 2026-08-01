@@ -5,7 +5,7 @@ import { ERROR_HINT, ERROR_LABEL } from "../../lib/quota-copy";
 import { toneForAccount } from "../../lib/quota-logic";
 import type { ServiceQuotaView } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
-import { StableSurface } from "../ui/surface";
+import { GlassSurface } from "../ui/glass";
 import { PausedBadge, PlanBadge, StatusBadge } from "../ui/status-badge";
 import { ProviderMark } from "./provider-mark";
 import { QuotaWindowRow } from "./quota-window-row";
@@ -27,7 +27,8 @@ export function ServiceQuotaCard({
   const paused = account.state === "paused";
 
   return (
-    <StableSurface
+    <GlassSurface
+      radius={18}
       className="quota-card p-4 flex flex-col gap-3"
       role="button"
       tabIndex={0}
@@ -78,7 +79,6 @@ export function ServiceQuotaCard({
       <div className="quota-card-footer flex items-center justify-between pt-2 border-t border-[var(--line)]">
         <span className="text-[11px] text-ink-3">
           上次成功 {formatDateTime(account.lastSuccessAt)}
-          {account.freshness === "fresh" ? " · 数据新鲜" : " · 数据陈旧"}
         </span>
         <div onClick={(event) => event.stopPropagation()}>
           <Button
@@ -92,6 +92,6 @@ export function ServiceQuotaCard({
           </Button>
         </div>
       </div>
-    </StableSurface>
+    </GlassSurface>
   );
 }
