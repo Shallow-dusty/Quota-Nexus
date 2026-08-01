@@ -71,7 +71,6 @@ export function AccountsPage() {
     <>
       <PageHeader
         title="账号与连接"
-        subtitle="管理供应商账号、凭据复用与固定网络出口"
         actions={
           <Button className="btn btn-prominent" onPress={() => setOpen(true)}>
             <Plus size={14} />
@@ -190,7 +189,7 @@ function ConnectionRow({
     : connection.authPaused
       ? "凭据失效，自动刷新已暂停"
       : connection.nextAttemptAt
-        ? `退避至 ${formatDateTime(connection.nextAttemptAt)}`
+        ? `将于 ${formatDateTime(connection.nextAttemptAt)} 重试`
         : connection.nextRefreshAt
           ? `计划 ${formatDateTime(connection.nextRefreshAt)}`
           : "仅手动刷新";
@@ -303,9 +302,6 @@ function EditAccountDialog({
         <Dialog aria-label="编辑账号" className="outline-none">
           <FloatingGlass className="w-[390px] max-w-full p-5">
             <h2 className="text-[15px] font-semibold text-ink-1">编辑账号</h2>
-            <p className="mt-1 text-[11.5px] text-ink-3">
-              修改本地显示标签，不影响供应商账号。
-            </p>
             <input
               autoFocus
               value={label}
@@ -376,8 +372,8 @@ function UpdateCredentialDialog({
             <h2 className="text-[15px] font-semibold text-ink-1">更新凭据</h2>
             <p className="mt-1 text-[11.5px] text-ink-3">
               {account?.sharedAccountCount && account.sharedAccountCount > 1
-                ? `更新后会恢复共享该凭据的 ${account.sharedAccountCount} 个账号。`
-                : "新凭据通过只读额度验证后才会替换旧值。"}
+                ? `该凭据被 ${account.sharedAccountCount} 个账号共享，更新后将同时恢复。`
+                : "验证通过后才会替换旧凭据。"}
             </p>
             <textarea
               autoFocus

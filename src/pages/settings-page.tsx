@@ -1,6 +1,5 @@
 import {
   Bell,
-  Eye,
   Globe2,
   History,
   LayoutGrid,
@@ -93,7 +92,7 @@ export function SettingsPage({
     <>
       <PageHeader
         title="设置"
-        subtitle={saving ? "正在保存…" : "刷新周期、通知、隐私、外观与诊断"}
+        subtitle={saving ? "正在保存…" : undefined}
       />
       <div className="page-scroll settings-page flex-1 overflow-y-auto px-7 py-5">
         {error && (
@@ -258,11 +257,6 @@ export function SettingsPage({
                 onChange={(privacyMode) => save({ privacyMode })}
               />
             </Row>
-            <Row label="秘密不进入 SQLite、日志或导出">
-              <span className="text-[11px] text-[var(--ok)] inline-flex items-center gap-1">
-                <Eye size={12} /> 已启用
-              </span>
-            </Row>
           </Section>
 
           <Section icon={<Globe2 size={15} />} title="固定出口">
@@ -410,7 +404,7 @@ function NetworkProfilesEditor({
         </label>
       )}
       <p className="text-[11px] text-ink-3">
-        修改会影响所有复用此出口的凭据；现有认证默认保留，不从界面回显。
+        修改影响所有复用此出口的凭据；认证留空则保留现有值。
       </p>
       <div className="flex gap-2">
         <Button

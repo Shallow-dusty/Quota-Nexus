@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, Globe, KeyRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Globe } from "lucide-react";
 import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { useEffect, useState } from "react";
 import {
@@ -282,10 +282,6 @@ export function AddAccountDialog({
                               invalidateValidation();
                             }}
                           />
-                          <p className="text-[11px] text-ink-3 flex items-center gap-1">
-                            <KeyRound size={11} />
-                            可直接粘贴浏览器请求头 JSON；应用会自动提取并仅保存凭据值
-                          </p>
                         </div>
                       )}
                     </Field>
@@ -367,7 +363,7 @@ export function AddAccountDialog({
                       {provider === "opencode-go" && (
                         <p className="text-[11px] text-ink-3 mt-2 flex items-center gap-1">
                           <Globe size={11} />
-                          Cookie 查询建议绑定创建该网页登录会话时的出口
+                          建议与网页登录时使用的网络出口一致
                         </p>
                       )}
                     </Field>}
@@ -376,9 +372,6 @@ export function AddAccountDialog({
                         {error}
                       </p>
                     )}
-                    <p className="text-[11px] text-ink-3">
-                      添加时会验证只读额度接口；不会调用模型，也不会消耗推理额度。
-                    </p>
                   </div>
                 )}
               </div>

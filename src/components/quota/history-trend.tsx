@@ -51,10 +51,7 @@ export function HistoryTrend() {
       <div className="px-4 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <History size={14} className="text-ink-3" />
-          <div>
-            <h2 className="text-[13px] font-semibold text-ink-1">额度趋势</h2>
-            <p className="text-[11px] text-ink-3">本机历史快照，不估算未来额度</p>
-          </div>
+          <h2 className="text-[13px] font-semibold text-ink-1">额度趋势</h2>
         </div>
         <Button className="btn btn-outline" onPress={() => setExpanded((value) => !value)}>
           {expanded ? "收起" : "展开"}

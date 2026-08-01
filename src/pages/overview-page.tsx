@@ -116,7 +116,6 @@ export function OverviewPage({
     <>
       <PageHeader
         title="概览"
-        subtitle="全部账号的额度窗口、重置时间与健康状态"
         actions={
           <>
             <SegmentedControl
@@ -128,7 +127,12 @@ export function OverviewPage({
                 { id: "stale", label: "陈旧" },
               ]}
             />
-            <Button className="btn btn-glass" onPress={() => refreshAll()} isDisabled={refreshing}>
+            <Button
+              className="btn btn-glass"
+              onPress={() => refreshAll()}
+              isDisabled={refreshing}
+              data-tooltip="刷新全部账号（Ctrl+R）"
+            >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
               <span>全部刷新</span>
             </Button>
@@ -191,10 +195,11 @@ export function OverviewPage({
           </Grid>
         ) : null}
 
-        <div className="data-provenance mt-5 text-[11px] text-ink-3">
-          已连接 {accounts?.length ?? 0} 个账号 · 数据来源：
-          {source === "tauri" ? "本机实时 Core" : "Phase 0 脱敏样本"}
-        </div>
+        {source === "phase0-fixture" && (
+          <div className="data-provenance mt-5 text-[11px] text-ink-3">
+            演示数据（浏览器预览模式）
+          </div>
+        )}
         <HistoryTrend />
       </div>
     </>
