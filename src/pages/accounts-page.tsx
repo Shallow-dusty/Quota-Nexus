@@ -18,6 +18,7 @@ import { useNow } from "../lib/use-now";
 import { PageHeader } from "../components/shell/app-shell";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { FloatingGlass, StableSurface } from "../components/ui/surface";
+import { useToast } from "../components/ui/toast";
 import { PausedBadge, PlanBadge, StatusBadge } from "../components/ui/status-badge";
 import { ProviderMark } from "../components/quota/provider-mark";
 import { AddAccountDialog } from "../components/quota/add-account-dialog";
@@ -32,6 +33,7 @@ export function AccountsPage() {
   const [credentialAccount, setCredentialAccount] =
     useState<AccountConnectionView | null>(null);
   const [deleting, setDeleting] = useState<AccountConnectionView | null>(null);
+  const toast = useToast();
 
   async function reload() {
     setConnections(await quotaClient.getConnections());
@@ -130,7 +132,10 @@ export function AccountsPage() {
       <AddAccountDialog
         open={open}
         onClose={() => setOpen(false)}
-        onSaved={setConnections}
+        onSaved={(data) => {
+          setConnections(data);
+          toast.success("账号已添加");
+        }}
       />
       <ConfirmDialog
         open={deleting !== null}
@@ -141,7 +146,12 @@ export function AccountsPage() {
         onConfirm={() => {
           if (!deleting) return;
           void act(deleting.id, () => quotaClient.deleteAccount(deleting.id)).then(
-            (ok) => ok && setDeleting(null),
+            (ok) => {
+              if (ok) {
+                setDeleting(null);
+                toast.success("已删除本地账号");
+              }
+            },
           );
         }}
         onClose={() => setDeleting(null)}
@@ -154,6 +164,7 @@ export function AccountsPage() {
         onSaved={(data) => {
           setConnections(data);
           setEditing(null);
+          toast.success("账号标签已保存");
         }}
       />
       <UpdateCredentialDialog
@@ -162,6 +173,7 @@ export function AccountsPage() {
         onSaved={(data) => {
           setConnections(data);
           setCredentialAccount(null);
+          toast.success("凭据已更新");
         }}
       />
     </>

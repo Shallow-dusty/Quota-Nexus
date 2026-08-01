@@ -13,6 +13,7 @@ import { Button } from "react-aria-components";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
+import { useToast } from "../components/ui/toast";
 import { formatRelativePast } from "../lib/format";
 import type {
   AppSettingsView,
@@ -48,6 +49,7 @@ export function SettingsPage({
   const [saving, setSaving] = useState(false);
   const [diagnosticFiles, setDiagnosticFiles] = useState<string[]>([]);
   const [diagnosticPath, setDiagnosticPath] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     let active = true;
@@ -196,8 +198,9 @@ export function SettingsPage({
                 onPress={async () => {
                   try {
                     await quotaClient.sendTestNotification();
+                    toast.success("测试通知已发送");
                   } catch (reason) {
-                    setError(commandErrorMessage(reason));
+                    toast.error("通知发送失败", commandErrorMessage(reason));
                   }
                 }}
               >

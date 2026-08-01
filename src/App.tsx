@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/shell/app-shell";
+import { ToastProvider } from "./components/ui/toast";
 import { AccountsPage } from "./pages/accounts-page";
 import { OverviewPage } from "./pages/overview-page";
 import { SettingsPage } from "./pages/settings-page";
@@ -49,23 +50,25 @@ export function App() {
   }, []);
 
   return (
-    <AppShell
-      page={page}
-      collapsed={collapsed}
-      onPageChange={setPage}
-      onToggleCollapsed={() => setCollapsed((c) => !c)}
-    >
-      {page === "overview" && <OverviewPage onPageChange={setPage} />}
-      {page === "accounts" && <AccountsPage />}
-      {page === "settings" && (
-        <SettingsPage
-          theme={theme}
-          onThemeChange={setTheme}
-          transparencyOff={transparencyOff}
-          onTransparencyChange={applyTransparency}
-          onPrivacyChange={applyPrivacy}
-        />
-      )}
-    </AppShell>
+    <ToastProvider>
+      <AppShell
+        page={page}
+        collapsed={collapsed}
+        onPageChange={setPage}
+        onToggleCollapsed={() => setCollapsed((c) => !c)}
+      >
+        {page === "overview" && <OverviewPage onPageChange={setPage} />}
+        {page === "accounts" && <AccountsPage />}
+        {page === "settings" && (
+          <SettingsPage
+            theme={theme}
+            onThemeChange={setTheme}
+            transparencyOff={transparencyOff}
+            onTransparencyChange={applyTransparency}
+            onPrivacyChange={applyPrivacy}
+          />
+        )}
+      </AppShell>
+    </ToastProvider>
   );
 }

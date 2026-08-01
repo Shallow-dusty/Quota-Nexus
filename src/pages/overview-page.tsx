@@ -2,6 +2,7 @@ import { Download, FilterX, Inbox, Plus, RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useEffect, useMemo, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
+import { useToast } from "../components/ui/toast";
 import { sortByRisk } from "../lib/quota-logic";
 import type { PageId, ServiceQuotaView } from "../lib/quota-types";
 import { PageHeader } from "../components/shell/app-shell";
@@ -26,7 +27,7 @@ export function OverviewPage({
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [exportPath, setExportPath] = useState<string | null>(null);
+  const toast = useToast();
 
   // Rust Core 是唯一刷新时钟；页面只接收首屏 DTO 与后续 overview-updated 事件。
   useEffect(() => {
@@ -139,11 +140,11 @@ export function OverviewPage({
             <Button
               className="btn btn-outline"
               onPress={async () => {
-                setLoadError(null);
                 try {
-                  setExportPath(await quotaClient.exportLatestSnapshot());
+                  const path = await quotaClient.exportLatestSnapshot();
+                  toast.success("脱敏快照已导出", path);
                 } catch (reason) {
-                  setLoadError(commandErrorMessage(reason));
+                  toast.error("快照导出失败", commandErrorMessage(reason));
                 }
               }}
             >
@@ -159,12 +160,6 @@ export function OverviewPage({
           <StableSurface className="mb-4 px-4 py-3">
             <p className="text-[12.5px] text-ink-2">额度数据读取失败</p>
             <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
-          </StableSurface>
-        )}
-        {exportPath && (
-          <StableSurface className="mb-4 px-4 py-3">
-            <p className="text-[12px] text-ink-2">脱敏快照已导出</p>
-            <p className="mt-0.5 break-all text-[11px] text-ink-3">{exportPath}</p>
           </StableSurface>
         )}
         {accounts && (
