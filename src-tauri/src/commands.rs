@@ -182,7 +182,14 @@ pub async fn update_settings(
     Ok(stored)
 }
 
+/// 幂等设置开机自启：目标状态与当前一致时直接返回。
+/// auto-launch 的 disable() 在注册表值不存在时会报错（ERROR_FILE_NOT_FOUND），
+/// 未启用过自启的机器上若不加判断，每次保存设置都会失败（v0.1.0 设置页全灭）。
 fn apply_autostart(app: &tauri::AppHandle, enabled: bool) -> Result<(), CommandError> {
+    let current = app.autolaunch().is_enabled().unwrap_or(false);
+    if current == enabled {
+        return Ok(());
+    }
     if enabled {
         app.autolaunch()
             .enable()

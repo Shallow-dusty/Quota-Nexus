@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "react-aria-components";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { useToast } from "../components/ui/toast";
 import { useApplyThresholds } from "../lib/thresholds";
@@ -53,25 +53,31 @@ export function SettingsPage({
   const toast = useToast();
   const applyThresholds = useApplyThresholds();
 
-  useEffect(() => {
-    let active = true;
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const load = useCallback(() => {
+    setLoadFailed(false);
+    setError(null);
     Promise.all([
       quotaClient.getSettings(),
       quotaClient.getProviderHealth(),
       quotaClient.getNetworkProfiles(),
     ])
       .then(([nextSettings, nextHealth, nextProfiles]) => {
-        if (!active) return;
         setSettings(nextSettings);
         setHealth(nextHealth);
         setNetworkProfiles(nextProfiles);
         onPrivacyChange?.(nextSettings.privacyMode);
       })
-      .catch((reason) => active && setError(commandErrorMessage(reason)));
-    return () => {
-      active = false;
-    };
+      .catch((reason) => {
+        setLoadFailed(true);
+        setError(commandErrorMessage(reason));
+      });
   }, [onPrivacyChange]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function save(patch: Partial<AppSettingsView>) {
     if (!settings || saving) return;
@@ -91,7 +97,9 @@ export function SettingsPage({
       setHealth(await quotaClient.getProviderHealth());
     } catch (reason) {
       setSettings(settings);
-      setError(commandErrorMessage(reason));
+      const message = commandErrorMessage(reason);
+      setError(message);
+      toast.error("设置保存失败", message);
     } finally {
       setSaving(false);
     }
@@ -105,8 +113,13 @@ export function SettingsPage({
       />
       <div className="page-scroll settings-page flex-1 overflow-y-auto px-7 py-5">
         {error && (
-          <StableSurface className="mb-4 px-4 py-3 text-[11.5px] text-[var(--danger)]">
-            {error}
+          <StableSurface className="mb-4 px-4 py-3 flex items-center justify-between gap-3">
+            <span className="text-[11.5px] text-[var(--danger)]">{error}</span>
+            {loadFailed && (
+              <Button className="btn btn-outline" onPress={load}>
+                重试
+              </Button>
+            )}
           </StableSurface>
         )}
         <div className="settings-grid max-w-[920px] grid grid-cols-2 gap-4">

@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.1.1 — 2026-08-01
+
+修复两个 v0.1.0 实装缺陷：
+
+- 安装后不再附带控制台黑框：发布版补 `windows_subsystem = "windows"`，EXE 编译为 GUI 子系统。
+- 修复设置页全部控件"保存即弹回"：auto-launch 的 `disable()` 在注册表值不存在时会报错，
+  导致未启用过自启的机器上每次保存设置都失败；自启设置改为幂等，目标状态一致时不再调用。
 
 产品更名为 **Quota Nexus**（曾用名 AI Quota Monitor）：
 
