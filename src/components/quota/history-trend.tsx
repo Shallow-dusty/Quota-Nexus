@@ -54,6 +54,21 @@ export function AccountTrend({ accountId }: { accountId: string }) {
   );
 }
 
+/** 系列配色与排序固定按窗口类型，不随数据遍历顺序漂移 */
+const KIND_ORDER = ["rolling_5h", "session", "weekly", "monthly", "unknown"];
+const KIND_COLOR: Record<string, string> = {
+  rolling_5h: "var(--accent)",
+  session: "var(--ok)",
+  weekly: "var(--warn)",
+  monthly: "var(--high)",
+  unknown: "var(--ink-3)",
+};
+
+const formatDay = (timestamp: number) =>
+  new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(
+    new Date(timestamp),
+  );
+
 function TrendPlot({ points }: { points: HistoryPointView[] }) {
   const series = useMemo(() => {
     const grouped = new Map<string, HistoryPointView[]>();
@@ -62,13 +77,14 @@ function TrendPlot({ points }: { points: HistoryPointView[] }) {
       current.push(point);
       grouped.set(point.windowKind, current);
     });
-    return [...grouped.entries()];
+    return [...grouped.entries()].sort(
+      ([a], [b]) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b),
+    );
   }, [points]);
   const timestamps = points.map((point) => Date.parse(point.observedAt));
   const minimum = Math.min(...timestamps);
   const maximum = Math.max(...timestamps);
   const span = Math.max(maximum - minimum, 1);
-  const colors = ["var(--accent)", "var(--warn)", "var(--ok)", "var(--high)"];
 
   return (
     <div>
@@ -95,7 +111,7 @@ function TrendPlot({ points }: { points: HistoryPointView[] }) {
               </text>
             </g>
           ))}
-          {series.map(([kind, values], index) => {
+          {series.map(([kind, values]) => {
             const coordinates = values
               .map((point) => {
                 const x = ((Date.parse(point.observedAt) - minimum) / span) * 760 + 30;
@@ -108,7 +124,7 @@ function TrendPlot({ points }: { points: HistoryPointView[] }) {
                 key={kind}
                 points={coordinates}
                 fill="none"
-                stroke={colors[index % colors.length]}
+                stroke={KIND_COLOR[kind] ?? KIND_COLOR.unknown}
                 strokeWidth="2"
                 vectorEffect="non-scaling-stroke"
               />
@@ -116,14 +132,19 @@ function TrendPlot({ points }: { points: HistoryPointView[] }) {
           })}
         </svg>
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-        {series.map(([kind, values], index) => {
+      <div className="mt-1 flex justify-between text-[10.5px] text-ink-3">
+        <span>{formatDay(minimum)}</span>
+        {span > 86_400_000 && <span>{formatDay(minimum + span / 2)}</span>}
+        <span>{formatDay(maximum)}</span>
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2">
+        {series.map(([kind, values]) => {
           const latest = values[values.length - 1];
           return (
             <span key={kind} className="inline-flex items-center gap-1.5 text-[11.5px] text-ink-2">
               <span
                 className="h-0.5 w-4 rounded-full"
-                style={{ background: colors[index % colors.length] }}
+                style={{ background: KIND_COLOR[kind] ?? KIND_COLOR.unknown }}
               />
               {latest.windowLabel}：{latest.usedPercent.toFixed(1)}%
             </span>
