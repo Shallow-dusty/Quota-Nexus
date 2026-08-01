@@ -5,6 +5,7 @@ import {
   healthyAccountCount,
   highestWindow,
   remainingPercent,
+  sortAccounts,
   sortByRisk,
   toneForAccount,
 } from "./quota-logic";
@@ -82,6 +83,38 @@ describe("账号健康与排序（档位由 Core 下发）", () => {
       account({ id: "crit", windows: [win(99, "critical")] }),
     ];
     expect(sortByRisk(accounts).map((a) => a.id)).toEqual(["crit", "warn"]);
+  });
+});
+
+describe("概览排序", () => {
+  const accounts = [
+    account({ id: "b-opencode", provider: "opencode-go", accountLabel: "乙", windows: [win(72, "warning")] }),
+    account({ id: "a-cline", provider: "clinepass", accountLabel: "甲", windows: [win(99, "critical")] }),
+    account({ id: "c-ollama", provider: "ollama-cloud", accountLabel: "丙", windows: [win(10, "normal")] }),
+  ];
+
+  it("risk：危险在前，与默认 sortByRisk 一致", () => {
+    expect(sortAccounts(accounts, "risk").map((a) => a.id)).toEqual([
+      "a-cline",
+      "b-opencode",
+      "c-ollama",
+    ]);
+  });
+
+  it("name：按中文标签稳定排序", () => {
+    expect(sortAccounts(accounts, "name").map((a) => a.id)).toEqual([
+      "c-ollama",
+      "a-cline",
+      "b-opencode",
+    ]);
+  });
+
+  it("provider：按供应商分组，组内按名称", () => {
+    expect(sortAccounts(accounts, "provider").map((a) => a.id)).toEqual([
+      "a-cline",
+      "b-opencode",
+      "c-ollama",
+    ]);
   });
 });
 

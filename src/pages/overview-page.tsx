@@ -3,7 +3,8 @@ import { Button } from "react-aria-components";
 import { useEffect, useMemo, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { useToast } from "../components/ui/toast";
-import { sortByRisk } from "../lib/quota-logic";
+import { sortAccounts, type AccountSortMode } from "../lib/quota-logic";
+import { useLocalPref } from "../lib/use-local-pref";
 import type { PageId, ServiceQuotaView } from "../lib/quota-types";
 import { PageHeader } from "../components/shell/app-shell";
 import { SegmentedControl } from "../components/ui/segmented";
@@ -26,6 +27,11 @@ export function OverviewPage({
   const [refreshing, setRefreshing] = useState(false);
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useLocalPref<AccountSortMode>(
+    "aiqm.overview-sort",
+    ["risk", "name", "provider"] as const,
+    "risk",
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const toast = useToast();
@@ -81,8 +87,8 @@ export function OverviewPage({
       if (filter === "stale") return a.state === "stale-with-error";
       return true;
     });
-    return sortByRisk(filtered);
-  }, [accounts, filter]);
+    return sortAccounts(filtered, sort);
+  }, [accounts, filter, sort]);
 
   async function reload() {
     try {
@@ -177,6 +183,21 @@ export function OverviewPage({
         {accounts && (
           <div className="mb-5">
             <SummaryStrip accounts={accounts} refreshedAt={refreshedAt} />
+          </div>
+        )}
+
+        {accounts && accounts.length > 0 && (
+          <div className="overview-toolbar mb-3 flex items-center justify-end gap-2">
+            <select
+              aria-label="排序方式"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as AccountSortMode)}
+              className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2 text-[12px] text-ink-1"
+            >
+              <option value="risk">风险优先</option>
+              <option value="name">名称</option>
+              <option value="provider">供应商</option>
+            </select>
           </div>
         )}
 

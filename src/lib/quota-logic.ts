@@ -92,6 +92,36 @@ export function sortByRisk(accounts: ServiceQuotaView[]): ServiceQuotaView[] {
   });
 }
 
+export type AccountSortMode = "risk" | "name" | "provider";
+
+const PROVIDER_ORDER: Record<string, number> = {
+  clinepass: 0,
+  "opencode-go": 1,
+  "ollama-cloud": 2,
+};
+
+const byLabel = (a: ServiceQuotaView, b: ServiceQuotaView) =>
+  a.accountLabel.localeCompare(b.accountLabel, "zh-CN");
+
+/**
+ * 概览排序：risk = 风险优先（位置随状态跳动，危险总在前面）；
+ * name/provider = 稳定排序（位置固定，便于肌肉记忆定位）。
+ */
+export function sortAccounts(
+  accounts: ServiceQuotaView[],
+  mode: AccountSortMode,
+): ServiceQuotaView[] {
+  if (mode === "name") return [...accounts].sort(byLabel);
+  if (mode === "provider") {
+    return [...accounts].sort(
+      (a, b) =>
+        (PROVIDER_ORDER[a.provider] ?? 99) - (PROVIDER_ORDER[b.provider] ?? 99) ||
+        byLabel(a, b),
+    );
+  }
+  return sortByRisk(accounts);
+}
+
 export function remainingPercent(usedPercent: number): number {
   return 100 - clampPercent(usedPercent);
 }
