@@ -13,6 +13,7 @@ import type {
 } from "../../lib/quota-types";
 import type { ProviderKind } from "../../lib/quota-types";
 import { GlassSurface } from "../ui/glass";
+import { GlassSelect } from "../ui/select";
 import { ProviderMark } from "./provider-mark";
 
 const PROVIDERS: Array<{ id: ProviderKind; name: string; hint: string }> = [
@@ -237,20 +238,19 @@ export function AddAccountDialog({
                         ]}
                       />
                       {credentialSource === "existing" && (
-                        <select
+                        <GlassSelect
+                          className="mt-2"
+                          ariaLabel="选择已有凭据"
                           value={existingCredentialId}
-                          onChange={(event) => {
-                            setExistingCredentialId(event.target.value);
+                          onChange={(id) => {
+                            setExistingCredentialId(id);
                             invalidateValidation();
                           }}
-                          className="mt-2 px-2.5 h-8 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[var(--surface-raised)] border border-[var(--line)] outline-none focus:border-[var(--accent)]"
-                        >
-                          {providerCredentials.map((credential) => (
-                            <option key={credential.id} value={credential.id}>
-                              {credential.label} · {credential.routeModeLabel}
-                            </option>
-                          ))}
-                        </select>
+                          options={providerCredentials.map((credential) => ({
+                            id: credential.id,
+                            label: `${credential.label} · ${credential.routeModeLabel}`,
+                          }))}
+                        />
                       )}
                       {credentialSource === "new" && (
                         <div className="flex flex-col gap-2 mt-2">
@@ -307,21 +307,19 @@ export function AddAccountDialog({
                         ]}
                       />
                       {route === "existing" && (
-                        <select
+                        <GlassSelect
+                          className="mt-2"
+                          ariaLabel="选择已有固定出口"
                           value={existingProfileId}
-                          onChange={(event) => {
-                            setExistingProfileId(event.target.value);
+                          onChange={(id) => {
+                            setExistingProfileId(id);
                             invalidateValidation();
                           }}
-                          className="mt-2 px-2.5 h-8 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[var(--surface-raised)] border border-[var(--line)] outline-none focus:border-[var(--accent)]"
-                        >
-                          {networkProfiles.map((profile) => (
-                            <option key={profile.id} value={profile.id}>
-                              {profile.label} · {profile.endpointLabel}
-                              {profile.hasAuth ? " · 已认证" : ""}
-                            </option>
-                          ))}
-                        </select>
+                          options={networkProfiles.map((profile) => ({
+                            id: profile.id,
+                            label: `${profile.label} · ${profile.endpointLabel}${profile.hasAuth ? " · 已认证" : ""}`,
+                          }))}
+                        />
                       )}
                       {route === "new" && (
                         <div className="grid grid-cols-2 gap-2 mt-2">

@@ -25,6 +25,7 @@ import type {
 import { useNow } from "../lib/use-now";
 import { PageHeader } from "../components/shell/app-shell";
 import { GlassSurface } from "../components/ui/glass";
+import { GlassSelect } from "../components/ui/select";
 import { SegmentedControl } from "../components/ui/segmented";
 
 interface SettingsProps {
@@ -379,18 +380,15 @@ function NetworkProfilesEditor({
 
   return (
     <div className="px-4 py-3 flex flex-col gap-2.5">
-      <select
-        aria-label="选择固定出口"
+      <GlassSelect
+        ariaLabel="选择固定出口"
         value={selected.id}
-        onChange={(event) => setSelectedId(event.target.value)}
-        className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2 text-[12px] text-ink-1"
-      >
-        {profiles.map((profile) => (
-          <option key={profile.id} value={profile.id}>
-            {profile.label} · {profile.endpointLabel}
-          </option>
-        ))}
-      </select>
+        onChange={setSelectedId}
+        options={profiles.map((profile) => ({
+          id: profile.id,
+          label: `${profile.label} · ${profile.endpointLabel}`,
+        }))}
+      />
       <div className="grid grid-cols-2 gap-2">
         <input
           aria-label="固定出口标签"

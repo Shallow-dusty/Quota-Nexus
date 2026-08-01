@@ -287,6 +287,7 @@ body {
 
 :root[data-theme="dark"] .app-shell {
   background:
+    radial-gradient(560px 700px at -12% 38%, rgba(70, 140, 200, 0.34), transparent 66%),
     radial-gradient(760px 560px at -8% 108%, rgba(214, 108, 58, 0.5), transparent 66%),
     radial-gradient(700px 500px at 108% -10%, rgba(46, 188, 165, 0.48), transparent 66%),
     radial-gradient(820px 560px at 50% -26%, rgba(96, 118, 190, 0.44), transparent 70%),
@@ -615,6 +616,97 @@ body {
 .btn-icon[data-hovered] {
   color: var(--ink-1);
   background: var(--accent-softer);
+}
+
+/* ---------- Glass select ---------- */
+
+.select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  min-width: 108px;
+  padding: 0 10px;
+  border: 1px solid var(--control-outline);
+  border-radius: var(--r-md);
+  background: var(--control-bg);
+  box-shadow: inset 0 1px 0 var(--control-border);
+  color: var(--ink-1);
+  font-size: 12px;
+  font-weight: 540;
+  cursor: default;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.select-trigger[data-hovered] {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.select-trigger[data-focus-visible] {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.select-chevron {
+  color: var(--ink-3);
+}
+
+.glass-popover {
+  z-index: 70;
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-outline);
+  border-radius: 12px;
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.select-popover {
+  min-width: var(--trigger-width);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  outline: none;
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--ink-1);
+  font-size: 12px;
+  cursor: default;
+}
+
+.select-option[data-hovered],
+.select-option[data-focused] {
+  background: var(--accent-soft);
+}
+
+.select-option[data-selected] {
+  color: var(--accent);
+  font-weight: 620;
+}
+
+:root[data-transparency="off"] .glass-popover {
+  background: var(--glass-solid);
+  border-color: var(--line-strong);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .segmented {

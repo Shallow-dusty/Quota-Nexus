@@ -38,7 +38,7 @@ export function AppShell({
       <GlassSurface
         as="nav"
         radius={24}
-        blur={14}
+        blur={8}
         className={`app-sidebar shrink-0 flex flex-col transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
           collapsed ? "w-16" : "w-56"
         }`}

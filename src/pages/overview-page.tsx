@@ -8,6 +8,7 @@ import { useLocalPref } from "../lib/use-local-pref";
 import type { PageId, ServiceQuotaView } from "../lib/quota-types";
 import { PageHeader } from "../components/shell/app-shell";
 import { SegmentedControl } from "../components/ui/segmented";
+import { GlassSelect } from "../components/ui/select";
 import { SkeletonCard } from "../components/ui/skeleton";
 import { AccountDetailDrawer } from "../components/quota/account-detail-drawer";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
@@ -206,16 +207,16 @@ export function OverviewPage({
               <span className="tnum text-[11px] text-ink-3">
                 上次刷新 {formatTime(refreshedAt)}
               </span>
-              <select
-                aria-label="排序方式"
+              <GlassSelect
+                ariaLabel="排序方式"
                 value={sort}
-                onChange={(event) => setSort(event.target.value as AccountSortMode)}
-                className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2 text-[12px] text-ink-1"
-              >
-                <option value="risk">风险优先</option>
-                <option value="name">名称</option>
-                <option value="provider">供应商</option>
-              </select>
+                onChange={setSort}
+                options={[
+                  { id: "risk", label: "风险优先" },
+                  { id: "name", label: "名称" },
+                  { id: "provider", label: "供应商" },
+                ]}
+              />
               <SegmentedControl
                 value={view}
                 onChange={setView}
