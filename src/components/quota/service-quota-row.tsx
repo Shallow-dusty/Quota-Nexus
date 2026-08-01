@@ -1,7 +1,7 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
 import { formatPercent, formatRelativePast } from "../../lib/format";
-import { clampPercent, toneForAccount } from "../../lib/quota-logic";
+import { clampPercent, remainingPercent, toneForAccount } from "../../lib/quota-logic";
 import type { ServiceQuotaView, WindowTone } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
 import { StableSurface } from "../ui/surface";
@@ -33,7 +33,7 @@ export function ServiceQuotaRow({
 
   return (
     <StableSurface
-      className="quota-row px-4 py-3 flex items-center gap-4"
+      className="quota-row px-5 py-4 flex items-center gap-5"
       role="button"
       tabIndex={0}
       aria-label={`查看账号详情：${account.accountLabel}`}
@@ -60,19 +60,20 @@ export function ServiceQuotaRow({
       <div className="quota-row-windows flex-1 flex items-center gap-4 min-w-0">
         {account.windows.map((w) => {
           const used = clampPercent(w.usedPercent);
+          const remaining = remainingPercent(used);
           return (
             <div key={w.id} className="quota-row-window min-w-0">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[11px] text-ink-3 truncate">{w.label}</span>
+                <span className="text-[11.5px] text-ink-3 truncate">{w.label}</span>
                 <strong
-                  className="tnum text-[13px] font-semibold"
+                  className="tnum text-[15px] font-semibold"
                   style={{ color: TONE_COLOR[w.tone] }}
                 >
-                  {formatPercent(used)}%
+                  {formatPercent(remaining)}%
                 </strong>
               </div>
               <div className="quota-row-track mt-1" data-tone={w.tone}>
-                <div style={{ width: `${used}%` }} />
+                <div style={{ width: `${remaining}%` }} />
               </div>
             </div>
           );
