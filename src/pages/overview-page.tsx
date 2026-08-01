@@ -1,4 +1,4 @@
-import { ArrowDownWideNarrow, Download, Plus, RefreshCw } from "lucide-react";
+import { Download, FilterX, Inbox, Plus, RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useEffect, useMemo, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
@@ -179,8 +179,10 @@ export function OverviewPage({
               <SkeletonCard key={i} />
             ))}
           </Grid>
-        ) : accounts && visible.length === 0 ? (
+        ) : accounts && accounts.length === 0 ? (
           <EmptyOverview onPageChange={onPageChange} />
+        ) : accounts && visible.length === 0 ? (
+          <FilterEmpty onClear={() => setFilter("all")} />
         ) : accounts ? (
           <Grid>
             {visible.map((account) => (
@@ -206,6 +208,25 @@ export function OverviewPage({
   );
 }
 
+function FilterEmpty({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="surface-stable p-10 flex flex-col items-center justify-center text-center gap-3">
+      <div className="w-12 h-12 rounded-xl bg-[rgba(127,141,168,.1)] flex items-center justify-center text-ink-3">
+        <FilterX size={22} />
+      </div>
+      <div>
+        <p className="text-ink-1 font-medium">当前筛选下没有账号</p>
+        <p className="text-[12.5px] text-ink-3 mt-1">
+          没有符合当前筛选条件的账号
+        </p>
+      </div>
+      <Button className="btn btn-outline" onPress={onClear}>
+        查看全部
+      </Button>
+    </div>
+  );
+}
+
 function Grid({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -228,7 +249,7 @@ function EmptyOverview({
   return (
     <div className="surface-stable p-10 flex flex-col items-center justify-center text-center gap-3">
       <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-accent">
-        <ArrowDownWideNarrow size={22} />
+        <Inbox size={22} />
       </div>
       <div>
         <p className="text-ink-1 font-medium">还没有账号</p>
