@@ -8,13 +8,14 @@ import {
 } from "lucide-react";
 import type { HealthTone } from "../../lib/quota-types";
 
+/** 风险三级收敛：warning/high 同呈"注意"，避免五级色噪声；陈旧是数据状态而非风险档 */
 const META: Record<
   HealthTone,
   { label: string; icon: ReactNode; cls: string }
 > = {
   normal: { label: "正常", icon: <CheckCircle2 size={12} />, cls: "badge-ok" },
-  warning: { label: "需关注", icon: <AlertTriangle size={12} />, cls: "badge-warn" },
-  high: { label: "高风险", icon: <AlertTriangle size={12} />, cls: "badge-high" },
+  warning: { label: "注意", icon: <AlertTriangle size={12} />, cls: "badge-warn" },
+  high: { label: "注意", icon: <AlertTriangle size={12} />, cls: "badge-warn" },
   critical: { label: "危险", icon: <Siren size={12} />, cls: "badge-crit" },
   stale: { label: "陈旧", icon: <TimerReset size={12} />, cls: "badge-stale" },
 };

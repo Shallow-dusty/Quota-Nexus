@@ -2,7 +2,15 @@ import { Clock3 } from "lucide-react";
 import { QuotaProgress } from "../ui/quota-progress";
 import { formatPercent, formatResetCountdown } from "../../lib/format";
 import { clampPercent, remainingPercent } from "../../lib/quota-logic";
-import type { QuotaWindowView } from "../../lib/quota-types";
+import type { QuotaWindowView, WindowTone } from "../../lib/quota-types";
+
+/** 数字即状态：非常态档位直接把关键数字染成档位色 */
+const TONE_COLOR: Record<WindowTone, string> = {
+  normal: "var(--ink-1)",
+  warning: "var(--fill-warn)",
+  high: "var(--fill-high)",
+  critical: "var(--fill-crit)",
+};
 
 export function QuotaWindowRow({
   window,
@@ -21,7 +29,10 @@ export function QuotaWindowRow({
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[12.5px] text-ink-2">{window.label}</span>
         <span className="flex items-baseline gap-1.5">
-          <strong className="tnum text-[15px] font-semibold text-ink-1">
+          <strong
+            className="tnum text-[17px] font-semibold"
+            style={{ color: TONE_COLOR[tone] }}
+          >
             {formatPercent(used)}%
           </strong>
           <span className="text-[11px] text-ink-3">已用</span>

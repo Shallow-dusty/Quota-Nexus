@@ -50,9 +50,9 @@
   --fill-stale: #8c948f;
   --track: rgba(30, 38, 33, 0.085);
 
-  --provider-clinepass: #59546f;
-  --provider-opencode: #354e69;
-  --provider-ollama: #3f5e59;
+  --provider-clinepass: #c2611f;
+  --provider-opencode: #6d5bd0;
+  --provider-ollama: #0f8a72;
 
   --stable-bg: rgba(255, 255, 254, 0.88);
   --stable-solid: #fffefd;
@@ -126,9 +126,9 @@
   --fill-stale: #89938d;
   --track: rgba(228, 237, 230, 0.1);
 
-  --provider-clinepass: #c0b8d5;
-  --provider-opencode: #a8bfd7;
-  --provider-ollama: #9fc7be;
+  --provider-clinepass: #e89a5e;
+  --provider-opencode: #a99df0;
+  --provider-ollama: #4ec9ae;
 
   --stable-bg: rgba(31, 35, 32, 0.92);
   --stable-solid: #202421;
@@ -852,6 +852,7 @@ body {
 }
 
 .quota-grid {
+  align-items: stretch;
   align-items: stretch;
 }
 
