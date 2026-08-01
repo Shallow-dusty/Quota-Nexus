@@ -104,7 +104,7 @@ export function AccountDetailDrawer({
   }
 
   return (
-    <div className="drawer-root fixed inset-0 z-40">
+    <div className="drawer-root fixed inset-0 z-[60]">
       <button
         type="button"
         className="drawer-backdrop absolute inset-0 w-full h-full"
@@ -137,7 +137,6 @@ export function AccountDetailDrawer({
                 </div>
                 <p className="text-[11.5px] text-ink-3 mt-0.5">
                   {account.providerName}
-                  {connection ? ` · ${connection.credentialLabel}` : ""}
                 </p>
                 <div className="mt-2">
                   {paused ? <PausedBadge /> : <StatusBadge tone={tone} />}

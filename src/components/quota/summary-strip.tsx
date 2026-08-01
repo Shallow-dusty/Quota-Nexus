@@ -38,7 +38,7 @@ export function SummaryStrip({
       />
       <Metric
         icon={<AlertTriangle size={13} className="text-warn" />}
-        label="需关注窗口"
+        label="注意窗口"
         value={
           <strong className="tnum text-ink-1">{attention}</strong>
         }

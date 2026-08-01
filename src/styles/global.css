@@ -1123,7 +1123,7 @@ input:checked ~ .toggle-thumb {
 
 .drawer-panel {
   width: min(440px, 94vw);
-  background: var(--floating-bg);
+  background: color-mix(in srgb, var(--floating-solid) 92%, transparent);
   border-left: 1px solid var(--floating-border);
   box-shadow: -24px 0 64px rgba(28, 34, 30, 0.18);
   backdrop-filter: blur(22px) saturate(1.15);

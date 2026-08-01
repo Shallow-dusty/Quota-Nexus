@@ -106,7 +106,7 @@ function TrendPlot({ points }: { points: HistoryPointView[] }) {
                 stroke="var(--line)"
                 strokeWidth="1"
               />
-              <text x="4" y={165 - value * 1.6} fill="var(--ink-3)" fontSize="10">
+              <text x="4" y={174 - value * 1.6} fill="var(--ink-3)" fontSize="10">
                 {value}%
               </text>
             </g>

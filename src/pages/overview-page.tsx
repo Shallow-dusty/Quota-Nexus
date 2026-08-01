@@ -136,7 +136,7 @@ export function OverviewPage({
               onChange={setFilter}
               options={[
                 { id: "all", label: "全部" },
-                { id: "attention", label: "需关注" },
+                { id: "attention", label: "注意" },
                 { id: "stale", label: "陈旧" },
               ]}
             />
