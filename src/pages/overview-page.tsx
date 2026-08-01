@@ -12,10 +12,10 @@ import { SkeletonCard } from "../components/ui/skeleton";
 import { AccountDetailDrawer } from "../components/quota/account-detail-drawer";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
 import { ServiceQuotaRow } from "../components/quota/service-quota-row";
-import { SummaryStrip } from "../components/quota/summary-strip";
 import { StableSurface } from "../components/ui/surface";
+import { formatTime } from "../lib/format";
 
-type Filter = "all" | "attention" | "stale";
+type Filter = "all" | "attention";
 
 export function OverviewPage({
   onPageChange,
@@ -90,11 +90,20 @@ export function OverviewPage({
           a.windows.some((window) => window.tone !== "normal")
         );
       }
-      if (filter === "stale") return a.state === "stale-with-error";
       return true;
     });
     return sortAccounts(filtered, sort);
   }, [accounts, filter, sort]);
+
+  const needsAttentionCount = useMemo(
+    () =>
+      (accounts ?? []).filter(
+        (a) =>
+          a.state === "stale-with-error" ||
+          a.windows.some((w) => w.tone !== "normal"),
+      ).length,
+    [accounts],
+  );
 
   async function reload() {
     try {
@@ -143,15 +152,6 @@ export function OverviewPage({
         title="概览"
         actions={
           <>
-            <SegmentedControl
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { id: "all", label: "全部" },
-                { id: "attention", label: "注意" },
-                { id: "stale", label: "陈旧" },
-              ]}
-            />
             <Button
               className="btn btn-glass"
               onPress={() => refreshAll()}
@@ -186,32 +186,45 @@ export function OverviewPage({
             <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
           </StableSurface>
         )}
-        {accounts && (
-          <div className="mb-5">
-            <SummaryStrip accounts={accounts} refreshedAt={refreshedAt} />
-          </div>
-        )}
-
         {accounts && accounts.length > 0 && (
-          <div className="overview-toolbar mb-3 flex items-center justify-end gap-2">
-            <select
-              aria-label="排序方式"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as AccountSortMode)}
-              className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2 text-[12px] text-ink-1"
-            >
-              <option value="risk">风险优先</option>
-              <option value="name">名称</option>
-              <option value="provider">供应商</option>
-            </select>
+          <div className="overview-toolbar mb-3 flex items-center gap-2">
             <SegmentedControl
-              value={view}
-              onChange={setView}
+              value={filter}
+              onChange={setFilter}
               options={[
-                { id: "grid", label: "网格" },
-                { id: "list", label: "列表" },
+                { id: "all", label: "全部" },
+                {
+                  id: "attention",
+                  label:
+                    needsAttentionCount > 0
+                      ? `需处理 ${needsAttentionCount}`
+                      : "需处理",
+                },
               ]}
             />
+            <div className="ml-auto flex items-center gap-2">
+              <span className="tnum text-[11px] text-ink-3">
+                上次刷新 {formatTime(refreshedAt)}
+              </span>
+              <select
+                aria-label="排序方式"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as AccountSortMode)}
+                className="h-8 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2 text-[12px] text-ink-1"
+              >
+                <option value="risk">风险优先</option>
+                <option value="name">名称</option>
+                <option value="provider">供应商</option>
+              </select>
+              <SegmentedControl
+                value={view}
+                onChange={setView}
+                options={[
+                  { id: "grid", label: "网格" },
+                  { id: "list", label: "列表" },
+                ]}
+              />
+            </div>
           </div>
         )}
 

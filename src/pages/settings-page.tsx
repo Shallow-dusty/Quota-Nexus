@@ -122,7 +122,8 @@ export function SettingsPage({
             )}
           </StableSurface>
         )}
-        <div className="settings-grid max-w-[920px] grid grid-cols-2 gap-4">
+        <div className="settings-grid max-w-[920px] flex items-start gap-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
           <Section icon={<Timer size={15} />} title="刷新">
             <Row label="刷新周期">
               <SegmentedControl
@@ -252,6 +253,8 @@ export function SettingsPage({
               />
             </Row>
           </Section>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
 
           <Section icon={<Palette size={15} />} title="外观">
             <Row label="主题">
@@ -331,6 +334,7 @@ export function SettingsPage({
               </div>
             </div>
           </Section>
+          </div>
         </div>
       </div>
     </>
