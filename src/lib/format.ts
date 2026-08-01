@@ -40,7 +40,7 @@ export function formatDateTime(value: string | null): string {
 
 /**
  * 重置倒计时："12 分钟后重置" / "约 5 小时后重置" / "约 3 天后重置"；
- * null 或无效 → null（调用方显示"重置时间未知"，不臆造倒计时，§11.3）。
+ * null 或无效 → null（调用方显示"重置时间未知"，不臆造倒计时，DESIGN §8）。
  */
 export function formatResetCountdown(
   resetsAt: string | null,

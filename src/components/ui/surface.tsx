@@ -16,7 +16,7 @@ const CLASS: Record<SurfaceKind, string> = {
 };
 
 /**
- * 三类材质表面（DESIGN §11.1）。
+ * 三类材质表面（DESIGN §8.1）。
  * stable = 数据区可读性优先；control = 导航/工具条；floating = 浮层。
  * 回退由 global.css 的 @supports / prefers-reduced-transparency / data-transparency 处理。
  */

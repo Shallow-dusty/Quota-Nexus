@@ -81,7 +81,7 @@ export function nearestReset(accounts: ServiceQuotaView[]): {
   );
 }
 
-/** 卡片排序：最危险状态优先（§11.3），同档按最高使用率降序 */
+/** 卡片排序：最危险状态优先（DESIGN §8），同档按最高使用率降序 */
 export function sortByRisk(accounts: ServiceQuotaView[]): ServiceQuotaView[] {
   const maxUsed = (a: ServiceQuotaView) =>
     Math.max(...a.windows.map((w) => w.usedPercent), 0);

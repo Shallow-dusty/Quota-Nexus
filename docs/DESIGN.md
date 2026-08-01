@@ -267,7 +267,7 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 | `cargo test --lib` | 28 通过、5 忽略；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
 | `cargo clippy --all-targets -- -D warnings` | 通过 |
 | `pnpm build` | 通过，JS 约 102KB gzip |
-| `pnpm visual:check` | 14 个视觉场景 + 50 账号场景通过 |
+| `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过 |
 | 真实本机数据 | 迁移目标 schema 5；已安装实例下次启动时升级；4 账号、三家 Provider 曾完成真实刷新 |
 
 ## 11. 后续演进

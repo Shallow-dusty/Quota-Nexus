@@ -1,5 +1,9 @@
 # Phase 0 只读探针运行手册
 
+> **状态：Phase 0 已完成并退出**。本手册留档供复验或供应商接口变更时重跑；
+> 文中的“DESIGN.md §17”指向归档设计版本（见 `docs/archive/`），现行设计基线
+> 见 `docs/DESIGN.md`。
+
 三个独立 CLI 探针，用于验证 ClinePass / OpenCode Go / Ollama Cloud 的真实额度接口
 契约（DESIGN.md §17 Phase 0）。
 

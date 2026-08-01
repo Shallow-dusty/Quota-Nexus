@@ -5,7 +5,7 @@ export interface SegmentOption<T extends string> {
   label: string;
 }
 
-/** 分段选择器（过滤/排序，§11.2） */
+/** 分段选择器（过滤/排序，DESIGN §8） */
 export function SegmentedControl<T extends string>({
   value,
   options,

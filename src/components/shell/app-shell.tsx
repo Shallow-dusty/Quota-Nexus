@@ -103,7 +103,7 @@ export function AppShell({
   );
 }
 
-/** 内容区页头：标题 + 右侧操作槽（§11.2） */
+/** 内容区页头：标题 + 右侧操作槽（DESIGN §8） */
 export function PageHeader({
   title,
   subtitle,

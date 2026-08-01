@@ -1,7 +1,7 @@
 /**
- * 前端视图模型（DESIGN.md §6.1、§8）。
+ * 前端视图模型（DESIGN.md §2、§3、§8）。
  * 只承载 Rust Core 脱敏 DTO 的展示形态；秘密、代理端点、完整 Workspace ID
- * 不在此层出现。Phase 1 静态阶段由 Phase 0 脱敏样本驱动。
+ * 不在此层出现。浏览器预览（非 Tauri 运行时）由脱敏样本驱动。
  */
 
 export type ProviderKind = "clinepass" | "opencode-go" | "ollama-cloud";
@@ -34,7 +34,7 @@ export interface QuotaWindowView {
   usedPercent: number;
   /** Core 按用户阈值计算的档位；前端不得自行用百分比比较阈值 */
   tone: WindowTone;
-  /** ISO8601；null 表示上游未提供，UI 必须显示"重置时间未知"（§8.3） */
+  /** ISO8601；null 表示上游未提供，UI 必须显示"重置时间未知"（DESIGN §8） */
   resetsAt: string | null;
 }
 

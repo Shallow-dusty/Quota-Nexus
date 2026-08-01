@@ -25,8 +25,8 @@ Ollama Cloud 和 ClinePass 账号。当前版本聚焦额度采集、历史、�
 - 手工录入或更新凭据（支持直接粘贴 Firefox 请求头 JSON）、同 Provider 凭据复用、
   OpenCode Workspace 自动发现、账号暂停/恢复、
   本地删除，以及 Credential 级固定 HTTP(S)/SOCKS5(H) 出口。
-- 7/30/90 天历史趋势、Warning/High/Critical Windows 通知、成功投递确认与失败重试、脱敏快照 JSON
-  和诊断 ZIP 导出。
+- 单账号 7/30/90 天历史趋势、Warning/High/Critical Windows 通知、成功投递确认与失败重试、
+  脱敏快照 JSON 和诊断 ZIP 导出。
 - 托盘运行、开机自启、截图隐私、浅色/深色/实色/高对比/减少动态适配。
 - Windows Credential Manager 保存 Provider 秘密和代理认证；SQLite 只保存业务元数据、额度、
   历史、调度和告警状态。

@@ -49,7 +49,7 @@ const opencodeB: ServiceQuotaView = {
   ],
 };
 
-// 与 opencodeB 共享同一 OpenCode Cookie（DESIGN §8.2 N:1），演示凭据复用
+// 与 opencodeB 共享同一 OpenCode Cookie（DESIGN §3 N:1），演示凭据复用
 const opencodeA: ServiceQuotaView = {
   id: "opencode-a",
   provider: "opencode-go",
@@ -80,7 +80,7 @@ const ollamaPro: ServiceQuotaView = {
   ],
 };
 
-// 状态矩阵：认证失效，保留最后成功数据（DESIGN §3.3、§11.4 stale-with-error）
+// 状态矩阵：认证失效，保留最后成功数据（DESIGN §3、§8 stale-with-error）
 const ollamaFreeStale: ServiceQuotaView = {
   id: "ollama-free-stale",
   provider: "ollama-cloud",

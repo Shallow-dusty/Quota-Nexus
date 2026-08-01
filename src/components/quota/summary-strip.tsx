@@ -9,7 +9,7 @@ import {
 import type { ServiceQuotaView } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
 
-/** 紧凑健康摘要条（§11.2）：单行四段，不做大型 hero 卡片 */
+/** 紧凑健康摘要条（DESIGN §8）：单行四段，不做大型 hero 卡片 */
 export function SummaryStrip({
   accounts,
   refreshedAt,

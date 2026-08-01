@@ -20,7 +20,7 @@ const META: Record<
   stale: { label: "陈旧", icon: <TimerReset size={12} />, cls: "badge-stale" },
 };
 
-/** 图标 + 文本 + 颜色三重信号（§11.3 不让颜色成为唯一信号） */
+/** 图标 + 文本 + 颜色三重信号（DESIGN §8：不让颜色成为唯一信号） */
 export function StatusBadge({ tone }: { tone: HealthTone }) {
   const m = META[tone];
   return (
