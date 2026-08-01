@@ -77,6 +77,9 @@ type QuotaWindow = {
 };
 ```
 
+发往 UI 的 DTO 额外携带 `tone`（normal/warning/high/critical），由 Core 按用户阈值
+统一计算；UI 不做百分比与阈值的二次比较。
+
 OpenCode 的一个登录 Cookie 可发现多个 Workspace。它们在 UI 中是不同账号，但共享一个
 Credential 和同一 NetworkProfile。当前三个适配器均已用真实账号验证，脱敏合同保存在
 `docs/provider-contracts/`。
@@ -172,11 +175,24 @@ ZIP 内容生成与解包扫描有独立 Rust 测试；导出中不包含 Cookie
 
 ## 8. 页面与交互
 
-MVP 只有三个一级页面：
+三个一级页面加一个详情层：
 
-- Overview：摘要、筛选/风险排序、账号卡、手动刷新、脱敏导出、可折叠趋势。
-- Accounts：添加、凭据复用/更新、标签编辑、暂停/恢复、调度诊断、本地删除。
+- Overview：摘要、筛选/风险排序、账号卡、手动刷新、脱敏导出。卡片点击进入详情层。
+- 账号详情抽屉：右侧滑入的详情层，从概览卡片或账号行进入，聚合该账号的额度窗口、
+  连接状态、单账号历史趋势和全部账号操作（刷新/暂停/编辑/凭据/删除）。
+- Accounts：添加、凭据复用/更新、标签编辑、暂停/恢复、调度诊断、本地删除；行点击进入详情层。
 - Settings：刷新/阈值/历史、托盘/自启、主题/透明/隐私、固定出口、Provider 诊断和导出。
+
+交互基线：
+
+- 动作结果用 toast 做瞬时反馈；只有初始加载失败使用页面级错误面。
+- 不可逆操作走应用内确认对话框，不使用原生 confirm。
+- 空状态区分“无账号”与“筛选无结果”，后者提供一键清除筛选。
+- 窗口健康档位（tone）由 Core 按用户阈值计算并随 DTO 下发；前端不持有阈值判断，
+  进度条阈值刻度跟随设置上下文。
+- 状态徽标按三级风险（正常/注意/危险）加中性态（陈旧/已暂停）呈现，
+  状态同时有文字/图标，不只依赖颜色。
+- 说明性内容不属于产品界面：架构承诺与设计理念进文档，界面只保留当下决策所需的信息。
 
 状态包含 loading、ready、refreshing、stale-with-error、paused、empty。认证、固定出口、解析
 和陈旧状态均有文字/图标，不只依赖颜色。
@@ -240,16 +256,16 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 - [x] 认证失效、陈旧、固定出口、解析、暂停、空状态均有文字/图标表现。
 - [x] 图表有等效数据表。
 - [x] 50 张额度卡全量渲染与滚动检查；当前无头回归环境首屏低于 2 秒。
-- [x] 生产 JS gzip 约 103KB，低于 120KB 目标。
+- [x] 生产 JS gzip 约 102KB，低于 120KB 目标。
 
 ### 10.4 当前证据
 
 | 检查 | 结果 |
 | --- | --- |
-| `pnpm test` | 10/10 |
-| `cargo test --lib` | 43 通过；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
+| `pnpm test` | 6/6 |
+| `cargo test --lib` | 28 通过、5 忽略；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
 | `cargo clippy --all-targets -- -D warnings` | 通过 |
-| `pnpm build` | 通过，JS 约 103KB gzip |
+| `pnpm build` | 通过，JS 约 102KB gzip |
 | `pnpm visual:check` | 14 个视觉场景 + 50 账号场景通过 |
 | 真实本机数据 | 迁移目标 schema 5；已安装实例下次启动时升级；4 账号、三家 Provider 曾完成真实刷新 |
 
