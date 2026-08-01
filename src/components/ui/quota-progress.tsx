@@ -26,7 +26,6 @@ export function QuotaProgress({
         style={{ width: `${width}%` }}
       >
         <span className="quota-fill-caustic" aria-hidden="true" />
-        <span className="quota-fill-cap" aria-hidden="true" />
       </div>
       <span className="quota-thresholds" aria-hidden="true">
         <i style={{ left: "70%" }} />

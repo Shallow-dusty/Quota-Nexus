@@ -77,7 +77,7 @@ export function ServiceQuotaCard({
           }}
         >
           <span className="font-medium">{ERROR_LABEL[account.errorCategory]}</span>
-          <span className="text-ink-3">· {ERROR_HINT[account.errorCategory]}</span>
+          <span className="text-ink-3"> · {ERROR_HINT[account.errorCategory]}</span>
         </div>
       )}
 

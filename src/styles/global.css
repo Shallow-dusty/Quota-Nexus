@@ -942,31 +942,8 @@ body {
   opacity: 0.78;
 }
 
-.quota-fill-cap {
-  position: absolute;
-  top: 50%;
-  right: -1px;
-  width: 8px;
-  height: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.92) 0 10%, transparent 24%),
-    linear-gradient(145deg, color-mix(in srgb, var(--quota-color) 56%, white), var(--quota-color-deep));
-  box-shadow:
-    inset -1px -1px 2px rgba(20, 29, 24, 0.18),
-    0 1px 4px var(--quota-glow);
-  transform: translate(22%, -50%);
-}
-
-.quota-track[data-state="empty"] .quota-fill-cap,
 .quota-track[data-state="empty"] .quota-fill-caustic {
   display: none;
-}
-
-.quota-track[data-state="full"] .quota-fill-cap {
-  right: 0;
-  transform: translate(0, -50%);
 }
 
 .quota-thresholds {
@@ -1307,7 +1284,6 @@ input:checked ~ .toggle-thumb {
     box-shadow: none !important;
   }
 
-  .quota-fill-cap,
   .quota-thresholds {
     display: none !important;
   }

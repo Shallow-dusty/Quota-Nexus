@@ -55,7 +55,8 @@ export function SummaryStrip({
               </strong>
               <span className="text-ink-3">
                 {" "}
-                · <span className="privacy-sensitive">{highest.account.accountLabel}</span>·{highest.window.label}
+                · <span className="privacy-sensitive">{highest.account.accountLabel}</span>
+                {" · "}{highest.window.label}
               </span>
             </span>
           ) : (
@@ -73,8 +74,8 @@ export function SummaryStrip({
                 {formatResetCountdown(nearest.window.resetsAt, now)}
               </span>
               <span className="text-ink-3">
-                {" "}
-                · <span className="privacy-sensitive">{nearest.account.accountLabel}</span>
+                {" · "}
+                <span className="privacy-sensitive">{nearest.account.accountLabel}</span>
               </span>
             </span>
           ) : (
