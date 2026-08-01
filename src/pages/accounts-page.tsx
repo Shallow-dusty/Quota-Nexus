@@ -16,7 +16,7 @@ import type { AccountConnectionView, ProviderKind } from "../lib/quota-types";
 import { useNow } from "../lib/use-now";
 import { PageHeader } from "../components/shell/app-shell";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
-import { StableSurface } from "../components/ui/surface";
+import { GlassSurface } from "../components/ui/glass";
 import { useToast } from "../components/ui/toast";
 import { PausedBadge, PlanBadge, StatusBadge } from "../components/ui/status-badge";
 import { ProviderMark } from "../components/quota/provider-mark";
@@ -95,10 +95,10 @@ export function AccountsPage() {
       <div className="page-scroll accounts-page flex-1 overflow-y-auto px-7 py-5">
         <div className="connections-list flex flex-col gap-3">
           {loadError && (
-            <StableSurface className="px-4 py-3">
+            <GlassSurface radius={16} className="px-4 py-3">
               <p className="text-[12.5px] text-ink-2">操作未完成</p>
               <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
-            </StableSurface>
+            </GlassSurface>
           )}
           {(connections ?? []).map((connection) => (
             <ConnectionRow
@@ -125,12 +125,12 @@ export function AccountsPage() {
             />
           ))}
           {connections?.length === 0 && (
-            <StableSurface className="px-6 py-10 text-center">
+            <GlassSurface radius={16} className="px-6 py-10 text-center">
               <p className="text-[13px] text-ink-2">还没有本地账号</p>
               <p className="mt-1 text-[11.5px] text-ink-3">
                 添加供应商账号，开始统一监控额度
               </p>
-            </StableSurface>
+            </GlassSurface>
           )}
         </div>
       </div>
@@ -236,7 +236,7 @@ function ConnectionRow({
           : "仅手动刷新";
 
   return (
-    <StableSurface
+    <GlassSurface radius={16}
       className="connection-row px-4 py-3.5 flex items-center gap-3.5"
       role="button"
       tabIndex={0}
@@ -330,7 +330,7 @@ function ConnectionRow({
           <Trash2 size={14} />
         </Button>
       </div>
-    </StableSurface>
+    </GlassSurface>
   );
 }
 

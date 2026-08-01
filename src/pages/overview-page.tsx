@@ -12,7 +12,7 @@ import { SkeletonCard } from "../components/ui/skeleton";
 import { AccountDetailDrawer } from "../components/quota/account-detail-drawer";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
 import { ServiceQuotaRow } from "../components/quota/service-quota-row";
-import { StableSurface } from "../components/ui/surface";
+import { GlassSurface } from "../components/ui/glass";
 import { formatTime } from "../lib/format";
 
 type Filter = "all" | "attention";
@@ -181,10 +181,10 @@ export function OverviewPage({
 
       <div className="page-scroll overview-page flex-1 overflow-y-auto px-7 py-5">
         {loadError && (
-          <StableSurface className="mb-4 px-4 py-3">
+          <GlassSurface radius={16} className="mb-4 px-4 py-3">
             <p className="text-[12.5px] text-ink-2">额度数据读取失败</p>
             <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
-          </StableSurface>
+          </GlassSurface>
         )}
         {accounts && accounts.length > 0 && (
           <div className="overview-toolbar mb-3 flex items-center gap-2">

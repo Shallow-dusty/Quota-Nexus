@@ -4,7 +4,7 @@ import { formatPercent, formatRelativePast } from "../../lib/format";
 import { clampPercent, remainingPercent, toneForAccount } from "../../lib/quota-logic";
 import type { ServiceQuotaView, WindowTone } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
-import { StableSurface } from "../ui/surface";
+import { GlassSurface } from "../ui/glass";
 import { PausedBadge, PlanBadge, StatusBadge } from "../ui/status-badge";
 import { ProviderMark } from "./provider-mark";
 
@@ -32,7 +32,7 @@ export function ServiceQuotaRow({
   const paused = account.state === "paused";
 
   return (
-    <StableSurface
+    <GlassSurface radius={16}
       className="quota-row px-5 py-4 flex items-center gap-5"
       role="button"
       tabIndex={0}
@@ -98,6 +98,6 @@ export function ServiceQuotaRow({
           </Button>
         </div>
       </div>
-    </StableSurface>
+    </GlassSurface>
   );
 }

@@ -12,7 +12,7 @@ import type {
   NetworkProfileView,
 } from "../../lib/quota-types";
 import type { ProviderKind } from "../../lib/quota-types";
-import { FloatingGlass } from "../ui/surface";
+import { GlassSurface } from "../ui/glass";
 import { ProviderMark } from "./provider-mark";
 
 const PROVIDERS: Array<{ id: ProviderKind; name: string; hint: string }> = [
@@ -130,7 +130,7 @@ export function AddAccountDialog({
       <Modal>
         <Dialog className="outline-none" aria-label="添加账号">
           {({ close: closeDialog }) => (
-            <FloatingGlass
+            <GlassSurface radius={20} blur={8}
               className="account-dialog w-[500px] max-w-full p-0 overflow-hidden"
             >
               {/* 步骤头 */}
@@ -440,7 +440,7 @@ export function AddAccountDialog({
                   {step < 1 && <ArrowRight size={14} />}
                 </Button>
               </div>
-            </FloatingGlass>
+            </GlassSurface>
           )}
         </Dialog>
       </Modal>

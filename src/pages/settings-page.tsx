@@ -24,7 +24,7 @@ import type {
 } from "../lib/quota-types";
 import { useNow } from "../lib/use-now";
 import { PageHeader } from "../components/shell/app-shell";
-import { StableSurface } from "../components/ui/surface";
+import { GlassSurface } from "../components/ui/glass";
 import { SegmentedControl } from "../components/ui/segmented";
 
 interface SettingsProps {
@@ -113,14 +113,14 @@ export function SettingsPage({
       />
       <div className="page-scroll settings-page flex-1 overflow-y-auto px-7 py-5">
         {error && (
-          <StableSurface className="mb-4 px-4 py-3 flex items-center justify-between gap-3">
+          <GlassSurface radius={18} className="mb-4 px-4 py-3 flex items-center justify-between gap-3">
             <span className="text-[11.5px] text-[var(--danger)]">{error}</span>
             {loadFailed && (
               <Button className="btn btn-outline" onPress={load}>
                 重试
               </Button>
             )}
-          </StableSurface>
+          </GlassSurface>
         )}
         <div className="settings-grid max-w-[920px] flex items-start gap-4">
           <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -495,13 +495,13 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <StableSurface className="settings-section flex flex-col">
+    <GlassSurface radius={18} className="settings-section flex flex-col">
       <div className="section-heading px-4 py-3 flex items-center gap-2.5 border-b border-[var(--line)]">
         <span className="section-icon text-ink-3">{icon}</span>
         <h3 className="text-[13px] font-semibold text-ink-1">{title}</h3>
       </div>
       <div className="flex flex-col">{children}</div>
-    </StableSurface>
+    </GlassSurface>
   );
 }
 

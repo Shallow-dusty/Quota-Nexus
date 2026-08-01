@@ -3,7 +3,7 @@ import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../../lib/quota-client";
 import type { AccountConnectionView } from "../../lib/quota-types";
-import { FloatingGlass } from "../ui/surface";
+import { GlassSurface } from "../ui/glass";
 
 /** 编辑账号标签（账号页与详情抽屉共用） */
 export function EditAccountDialog({
@@ -28,7 +28,7 @@ export function EditAccountDialog({
     >
       <Modal>
         <Dialog aria-label="编辑账号" className="outline-none">
-          <FloatingGlass className="w-[390px] max-w-full p-5">
+          <GlassSurface radius={20} blur={8} className="w-[390px] max-w-full p-5">
             <h2 className="text-[15px] font-semibold text-ink-1">编辑账号</h2>
             <input
               autoFocus
@@ -64,7 +64,7 @@ export function EditAccountDialog({
                 <Check size={14} /> {saving ? "保存中…" : "保存"}
               </Button>
             </div>
-          </FloatingGlass>
+          </GlassSurface>
         </Dialog>
       </Modal>
     </ModalOverlay>
@@ -97,7 +97,7 @@ export function UpdateCredentialDialog({
     >
       <Modal>
         <Dialog aria-label="更新凭据" className="outline-none">
-          <FloatingGlass className="w-[430px] max-w-full p-5">
+          <GlassSurface radius={20} blur={8} className="w-[430px] max-w-full p-5">
             <h2 className="text-[15px] font-semibold text-ink-1">更新凭据</h2>
             <p className="mt-1 text-[11.5px] text-ink-3">
               {account?.sharedAccountCount && account.sharedAccountCount > 1
@@ -146,7 +146,7 @@ export function UpdateCredentialDialog({
                 <KeyRound size={14} /> {saving ? "验证中…" : "验证并更新"}
               </Button>
             </div>
-          </FloatingGlass>
+          </GlassSurface>
         </Dialog>
       </Modal>
     </ModalOverlay>

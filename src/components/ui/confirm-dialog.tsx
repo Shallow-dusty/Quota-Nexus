@@ -1,6 +1,6 @@
 import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
 import type { ReactNode } from "react";
-import { FloatingGlass } from "./surface";
+import { GlassSurface } from "./glass";
 
 /** 与应用设计语言一致的确认对话框；用于删除等不可逆操作，替代原生 window.confirm。 */
 export function ConfirmDialog({
@@ -31,7 +31,7 @@ export function ConfirmDialog({
     >
       <Modal>
         <Dialog aria-label={title} className="outline-none">
-          <FloatingGlass className="w-[380px] max-w-full p-5">
+          <GlassSurface radius={20} blur={8} className="w-[380px] max-w-full p-5">
             <h2 className="text-[15px] font-semibold text-ink-1">{title}</h2>
             {children && (
               <div className="mt-1.5 text-[12px] text-ink-3 leading-relaxed">
@@ -50,7 +50,7 @@ export function ConfirmDialog({
                 {busy ? "处理中…" : confirmLabel}
               </Button>
             </div>
-          </FloatingGlass>
+          </GlassSurface>
         </Dialog>
       </Modal>
     </ModalOverlay>

@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
-import { FloatingGlass } from "./surface";
+import { GlassSurface } from "./glass";
 
 type ToastTone = "success" | "error" | "info";
 
@@ -88,7 +88,7 @@ function ToastCard({
   }, [toast.id, toast.tone, onDismiss]);
 
   return (
-    <FloatingGlass className={`toast toast-${toast.tone}`} role="status">
+    <GlassSurface radius={14} blur={8} className={`toast toast-${toast.tone}`} role="status">
       <span className="toast-icon" aria-hidden="true">
         {ICONS[toast.tone]}
       </span>
@@ -105,7 +105,7 @@ function ToastCard({
       >
         <X size={13} />
       </Button>
-    </FloatingGlass>
+    </GlassSurface>
   );
 }
 

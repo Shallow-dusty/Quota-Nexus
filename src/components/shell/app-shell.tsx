@@ -9,8 +9,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { Button } from "react-aria-components";
 import type { PageId } from "../../lib/quota-types";
 import { AppMark } from "./app-mark";
-import { ControlGlass } from "../ui/surface";
-import { LiquidFilters } from "../ui/liquid-filters";
+import { GlassSurface } from "../ui/glass";
 
 const NAV: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> =
   [
@@ -36,9 +35,10 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="app-canvas app-shell h-full flex">
-      <LiquidFilters />
-      <ControlGlass
+      <GlassSurface
         as="nav"
+        radius={24}
+        blur={14}
         className={`app-sidebar shrink-0 flex flex-col transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
           collapsed ? "w-16" : "w-56"
         }`}
@@ -94,7 +94,7 @@ export function AppShell({
             )}
           </Button>
         </div>
-      </ControlGlass>
+      </GlassSurface>
 
       <main className="workspace-stage flex-1 min-w-0 flex flex-col">
         {children}
