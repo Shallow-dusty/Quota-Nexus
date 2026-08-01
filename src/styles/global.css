@@ -240,13 +240,7 @@ body {
   border-radius: var(--r-sm);
 }
 
-.liquid-filter-defs {
-  position: fixed;
-  inset: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
+
 
 /* ---------- Window scene ---------- */
 
@@ -301,54 +295,8 @@ body {
 }
 
 .app-sidebar {
-  position: relative;
-  isolation: isolate;
   overflow: hidden;
-  border: 1px solid var(--control-outline);
-  border-radius: var(--r-xl);
-  background: var(--control-bg);
-  box-shadow:
-    inset 0 1px 0 var(--control-border),
-    inset 1px 0 0 rgba(255, 255, 255, 0.28),
-    inset -1px 0 0 rgba(255, 255, 255, 0.12),
-    0 22px 54px rgba(35, 49, 43, 0.14);
-  backdrop-filter:
-    url("#liquid-panel-refraction")
-    blur(34px)
-    saturate(1.28);
-  -webkit-backdrop-filter: blur(34px) saturate(1.28);
-}
-
-.app-sidebar::before {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  top: -28px;
-  right: -44px;
-  width: 176px;
-  height: 126px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 46% 54% 62% 38% / 44% 38% 62% 56%;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 34% 35%, rgba(255, 255, 255, 0.46) 0 2%, transparent 18%),
-    radial-gradient(ellipse at 52% 42%, rgba(255, 255, 255, 0.16), transparent 62%);
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
-    0 12px 38px rgba(74, 130, 122, 0.055);
-  opacity: 0.72;
-  transform: rotate(-12deg);
-}
-
-.app-sidebar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    linear-gradient(124deg, rgba(255, 255, 255, 0.2), transparent 24%, transparent 75%, rgba(92, 138, 132, 0.07));
+  /* 玻璃材质统一由 .glass-surface 提供 */
 }
 
 .app-sidebar > * {
@@ -444,9 +392,7 @@ body {
 
 /* ---------- Surface hierarchy ---------- */
 
-.surface-stable,
-.surface-control,
-.surface-floating {
+.surface-stable {
   position: relative;
   isolation: isolate;
   border: 1px solid transparent;
@@ -454,23 +400,6 @@ body {
     background-color var(--dur-med) var(--ease),
     border-color var(--dur-med) var(--ease),
     box-shadow var(--dur-med) var(--ease);
-}
-
-.surface-floating::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: -70px;
-  right: -46px;
-  width: 240px;
-  height: 178px;
-  border-radius: 50%;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 36% 48%, rgba(255, 255, 255, 0.42) 0 2%, transparent 17%),
-    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.13), transparent 68%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  transform: rotate(-8deg);
 }
 
 .surface-stable {
@@ -481,37 +410,6 @@ body {
     inset 0 1px 0 var(--stable-border),
     inset 0 -1px 0 rgba(45, 58, 50, 0.025),
     var(--stable-shadow);
-}
-
-.surface-control {
-  background: transparent;
-}
-
-.surface-floating {
-  overflow: hidden;
-  border-color: var(--floating-outline);
-  border-radius: calc(var(--r-lg) + 2px);
-  background: var(--floating-bg);
-  box-shadow:
-    inset 0 1px 0 var(--floating-border),
-    inset 1px 0 0 rgba(255, 255, 255, 0.18),
-    var(--floating-shadow);
-  backdrop-filter:
-    url("#liquid-panel-refraction")
-    blur(34px)
-    saturate(1.18);
-  -webkit-backdrop-filter: blur(34px) saturate(1.18);
-}
-
-.surface-floating::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    linear-gradient(128deg, rgba(255, 255, 255, 0.25), transparent 23%, transparent 78%, rgba(85, 140, 132, 0.07));
 }
 
 /* ---------- Liquid glass (Chromium refraction) ---------- */
@@ -560,10 +458,7 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.64),
     inset 0 -1px 0 rgba(40, 53, 46, 0.06),
     0 5px 14px rgba(37, 46, 40, 0.08);
-  backdrop-filter:
-    url("#liquid-control-refraction")
-    blur(12px)
-    saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
 }
 
@@ -632,10 +527,7 @@ body {
     inset 0 1px 0 var(--control-border),
     inset 0 -1px 0 rgba(34, 43, 37, 0.045),
     0 5px 14px rgba(31, 39, 34, 0.06);
-  backdrop-filter:
-    url("#liquid-control-refraction")
-    blur(14px)
-    saturate(1.22);
+  backdrop-filter: blur(14px) saturate(1.22);
   -webkit-backdrop-filter: blur(14px) saturate(1.22);
 }
 
@@ -660,10 +552,7 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.34),
     0 6px 16px rgba(24, 75, 166, 0.18);
-  backdrop-filter:
-    url("#liquid-control-refraction")
-    blur(12px)
-    saturate(1.18);
+  backdrop-filter: blur(12px) saturate(1.18);
   -webkit-backdrop-filter: blur(12px) saturate(1.18);
 }
 
@@ -742,10 +631,7 @@ body {
   box-shadow:
     inset 0 1px 0 var(--control-border),
     0 5px 16px rgba(31, 39, 34, 0.06);
-  backdrop-filter:
-    url("#liquid-control-refraction")
-    blur(14px)
-    saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
 
@@ -1225,11 +1111,13 @@ input:checked ~ .toggle-thumb {
 
 .drawer-panel {
   width: min(440px, 94vw);
-  background: color-mix(in srgb, var(--floating-solid) 92%, transparent);
-  border-left: 1px solid var(--floating-border);
-  box-shadow: -24px 0 64px rgba(28, 34, 30, 0.18);
-  backdrop-filter: blur(22px) saturate(1.15);
-  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  background: var(--glass-sheen), var(--glass-bg);
+  border-left: 1px solid var(--glass-outline);
+  box-shadow:
+    -24px 0 64px rgba(28, 34, 30, 0.2),
+    inset 1px 0 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(24px) saturate(1.18);
+  -webkit-backdrop-filter: blur(24px) saturate(1.18);
   animation: drawer-in var(--dur-med) var(--ease);
 }
 
