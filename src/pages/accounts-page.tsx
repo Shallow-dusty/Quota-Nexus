@@ -16,6 +16,7 @@ import { toneForAccount } from "../lib/quota-logic";
 import type { AccountConnectionView, ProviderKind } from "../lib/quota-types";
 import { useNow } from "../lib/use-now";
 import { PageHeader } from "../components/shell/app-shell";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { FloatingGlass, StableSurface } from "../components/ui/surface";
 import { PausedBadge, PlanBadge, StatusBadge } from "../components/ui/status-badge";
 import { ProviderMark } from "../components/quota/provider-mark";
@@ -30,6 +31,7 @@ export function AccountsPage() {
   const [editing, setEditing] = useState<AccountConnectionView | null>(null);
   const [credentialAccount, setCredentialAccount] =
     useState<AccountConnectionView | null>(null);
+  const [deleting, setDeleting] = useState<AccountConnectionView | null>(null);
 
   async function reload() {
     setConnections(await quotaClient.getConnections());
@@ -50,21 +52,25 @@ export function AccountsPage() {
     };
   }, []);
 
-  async function act(id: string, action: () => Promise<unknown>) {
+  async function act(id: string, action: () => Promise<unknown>): Promise<boolean> {
     setBusyId(id);
     setLoadError(null);
+    let ok = true;
     try {
       await action();
     } catch (reason) {
+      ok = false;
       setLoadError(commandErrorMessage(reason));
     } finally {
       try {
         await reload();
       } catch (reason) {
+        ok = false;
         setLoadError(commandErrorMessage(reason));
       }
       setBusyId(null);
     }
+    return ok;
   }
 
   return (
@@ -107,15 +113,7 @@ export function AccountsPage() {
               }
               onEdit={() => setEditing(connection)}
               onCredential={() => setCredentialAccount(connection)}
-              onDelete={() => {
-                if (
-                  window.confirm(
-                    `仅从本机删除“${connection.accountLabel}”及其历史记录？`,
-                  )
-                ) {
-                  void act(connection.id, () => quotaClient.deleteAccount(connection.id));
-                }
-              }}
+              onDelete={() => setDeleting(connection)}
             />
           ))}
           {connections?.length === 0 && (
@@ -134,6 +132,22 @@ export function AccountsPage() {
         onClose={() => setOpen(false)}
         onSaved={setConnections}
       />
+      <ConfirmDialog
+        open={deleting !== null}
+        title="删除本地账号"
+        confirmLabel="删除"
+        danger
+        busy={deleting !== null && busyId === deleting.id}
+        onConfirm={() => {
+          if (!deleting) return;
+          void act(deleting.id, () => quotaClient.deleteAccount(deleting.id)).then(
+            (ok) => ok && setDeleting(null),
+          );
+        }}
+        onClose={() => setDeleting(null)}
+      >
+        将从本机删除“{deleting?.accountLabel}”及其历史记录，供应商账号不受影响。
+      </ConfirmDialog>
       <EditAccountDialog
         account={editing}
         onClose={() => setEditing(null)}
