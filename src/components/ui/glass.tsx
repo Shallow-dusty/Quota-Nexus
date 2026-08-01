@@ -119,17 +119,11 @@ function applyGlassFilter(
   filter.setAttribute("colorInterpolationFilters", "sRGB");
   defs.appendChild(filter);
 
-  sub(filter, "feGaussianBlur", {
-    in: "SourceGraphic",
-    stdDeviation: blur,
-    result: "blurred",
-  });
-  sub(filter, "feColorMatrix", {
-    in: "blurred",
-    type: "saturate",
-    values: saturate,
-    result: "tinted",
-  });
+  // Refraction only — displace the backdrop using the per-size squircle map.
+  // blur + saturate are applied as CSS backdrop-filter functions *before* this
+  // SVG filter, so the SVG chain stays pure geometry (no feGaussianBlur /
+  // feColorMatrix): the backdrop reads as crystal refraction rather than a
+  // frosted blur.
   sub(filter, "feImage", {
     href: maps.dispUrl,
     x: 0,
@@ -140,13 +134,15 @@ function applyGlassFilter(
     result: "dispmap",
   });
   sub(filter, "feDisplacementMap", {
-    in: "tinted",
+    in: "SourceGraphic",
     in2: "dispmap",
     scale: maps.maxDisp,
     xChannelSelector: "R",
     yChannelSelector: "G",
     result: "refracted",
   });
+  // Specular rim — screen-blend (not over-composite) a soft white highlight so
+  // the edge glows gently instead of reading as a hard painted white line.
   sub(filter, "feImage", {
     href: maps.specUrl,
     x: 0,
@@ -156,13 +152,13 @@ function applyGlassFilter(
     preserveAspectRatio: "none",
     result: "specmap",
   });
-  sub(filter, "feComposite", {
-    in: "specmap",
-    in2: "refracted",
-    operator: "over",
+  sub(filter, "feBlend", {
+    in: "refracted",
+    in2: "specmap",
+    mode: "screen",
   });
 
-  const chain = `url(#${id})`;
+  const chain = `blur(${blur}px) saturate(${saturate}) url(#${id})`;
   el.style.backdropFilter = chain;
   el.style.setProperty("-webkit-backdrop-filter", chain);
 
@@ -182,8 +178,8 @@ function applyPlain(el: HTMLElement, { blur, saturate }: { blur: number; saturat
 export function GlassSurface<T extends ElementType = "div">({
   as,
   radius = 18,
-  blur = 6,
-  saturate = 1.14,
+  blur = 5,
+  saturate = 1.25,
   glass,
   className,
   style,

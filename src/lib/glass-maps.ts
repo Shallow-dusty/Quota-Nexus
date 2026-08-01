@@ -87,9 +87,9 @@ export function buildGlassMaps({
   maxDisp = 8,
   refraction = 1,
   lightAngle = -65,
-  specStrength = 1.25,
-  edgeWidth = 1.6,
-  edgeAmbient = 0.38,
+  specStrength = 0.85,
+  edgeWidth = 1.4,
+  edgeAmbient = 0.22,
   resolution = 1,
 }: GlassMapsOptions): GlassMaps {
   const w = Math.max(2, Math.round(width * resolution));
