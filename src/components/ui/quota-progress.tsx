@@ -1,6 +1,7 @@
 import type { HealthTone } from "../../lib/quota-types";
+import { useThresholds } from "../../lib/thresholds";
 
-/** 有阈值参照的液态线性进度条；颜色只表达状态，不承担装饰性渐变。 */
+/** 有阈值参照的线性进度条；刻度位置跟随用户设置，颜色只表达状态。 */
 export function QuotaProgress({
   percent,
   tone,
@@ -8,6 +9,7 @@ export function QuotaProgress({
   percent: number;
   tone: HealthTone;
 }) {
+  const thresholds = useThresholds();
   const width = Math.min(100, Math.max(0, percent));
   const state = width <= 0 ? "empty" : width >= 100 ? "full" : "partial";
   return (
@@ -28,9 +30,9 @@ export function QuotaProgress({
         <span className="quota-fill-caustic" aria-hidden="true" />
       </div>
       <span className="quota-thresholds" aria-hidden="true">
-        <i style={{ left: "70%" }} />
-        <i style={{ left: "85%" }} />
-        <i style={{ left: "95%" }} />
+        <i style={{ left: `${thresholds.warning}%` }} />
+        <i style={{ left: `${thresholds.high}%` }} />
+        <i style={{ left: `${thresholds.critical}%` }} />
       </span>
     </div>
   );

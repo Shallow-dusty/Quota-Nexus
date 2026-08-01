@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { useToast } from "../components/ui/toast";
+import { useApplyThresholds } from "../lib/thresholds";
 import { formatRelativePast } from "../lib/format";
 import type {
   AppSettingsView,
@@ -50,6 +51,7 @@ export function SettingsPage({
   const [diagnosticFiles, setDiagnosticFiles] = useState<string[]>([]);
   const [diagnosticPath, setDiagnosticPath] = useState<string | null>(null);
   const toast = useToast();
+  const applyThresholds = useApplyThresholds();
 
   useEffect(() => {
     let active = true;
@@ -80,6 +82,11 @@ export function SettingsPage({
     try {
       const stored = await quotaClient.updateSettings(next);
       setSettings(stored);
+      applyThresholds({
+        warning: stored.warningThreshold,
+        high: stored.highThreshold,
+        critical: stored.criticalThreshold,
+      });
       if ("privacyMode" in patch) onPrivacyChange?.(stored.privacyMode);
       setHealth(await quotaClient.getProviderHealth());
     } catch (reason) {

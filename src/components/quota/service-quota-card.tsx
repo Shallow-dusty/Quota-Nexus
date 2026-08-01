@@ -1,12 +1,7 @@
 import { MoreHorizontal, RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
-import { formatDateTime, formatResetCountdown } from "../../lib/format";
-import {
-  clampPercent,
-  remainingPercent,
-  toneForAccount,
-  toneForPercent,
-} from "../../lib/quota-logic";
+import { formatDateTime } from "../../lib/format";
+import { toneForAccount } from "../../lib/quota-logic";
 import type { ErrorCategory, ServiceQuotaView } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
 import { StableSurface } from "../ui/surface";
@@ -110,4 +105,3 @@ export function ServiceQuotaCard({
   );
 }
 
-export { clampPercent, remainingPercent, toneForPercent, formatResetCountdown };

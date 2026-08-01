@@ -10,6 +10,52 @@ pub struct QuotaWindowView {
     pub resets_at: Option<String>,
 }
 
+/// 窗口健康档位（"normal" | "warning" | "high" | "critical"）。
+/// 阈值是 Core 持有的用户设置，档位只能由此函数计算，前端不再自行判断。
+pub fn window_tone(used_percent: f64, settings: &AppSettingsView) -> String {
+    let percent = if used_percent.is_nan() {
+        0.0
+    } else {
+        used_percent.clamp(0.0, 100.0)
+    };
+    if percent >= settings.critical_threshold {
+        "critical"
+    } else if percent >= settings.high_threshold {
+        "high"
+    } else if percent >= settings.warning_threshold {
+        "warning"
+    } else {
+        "normal"
+    }
+    .to_string()
+}
+
+/// 发往 UI 的窗口 DTO：在解析/存储模型之上附带按用户阈值算好的健康档位。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TonedQuotaWindow {
+    pub id: String,
+    pub kind: String,
+    pub label: String,
+    pub used_percent: f64,
+    pub resets_at: Option<String>,
+    pub tone: String,
+}
+
+impl TonedQuotaWindow {
+    pub fn from_window(window: QuotaWindowView, settings: &AppSettingsView) -> Self {
+        let tone = window_tone(window.used_percent, settings);
+        Self {
+            id: window.id,
+            kind: window.kind,
+            label: window.label,
+            used_percent: window.used_percent,
+            resets_at: window.resets_at,
+            tone,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceQuotaView {
@@ -23,7 +69,7 @@ pub struct ServiceQuotaView {
     pub last_success_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_category: Option<String>,
-    pub windows: Vec<QuotaWindowView>,
+    pub windows: Vec<TonedQuotaWindow>,
 }
 
 #[derive(Debug, Clone, Serialize)]

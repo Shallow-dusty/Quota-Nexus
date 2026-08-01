@@ -74,7 +74,7 @@ export function OverviewPage({
       if (filter === "attention") {
         return (
           a.state === "stale-with-error" ||
-          a.windows.some((window) => window.usedPercent >= 70)
+          a.windows.some((window) => window.tone !== "normal")
         );
       }
       if (filter === "stale") return a.state === "stale-with-error";

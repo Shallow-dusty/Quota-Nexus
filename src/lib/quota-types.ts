@@ -6,8 +6,11 @@
 
 export type ProviderKind = "clinepass" | "opencode-go" | "ollama-cloud";
 
-/** 健康档位：与 §10.1 告警三级（Warning 70 / High 85 / Critical 95）对齐，外加陈旧 */
-export type HealthTone = "normal" | "warning" | "high" | "critical" | "stale";
+/** 窗口健康档位：由 Rust Core 按用户阈值计算下发（normal/warning/high/critical） */
+export type WindowTone = "normal" | "warning" | "high" | "critical";
+
+/** 账号健康档位：窗口档位外加陈旧（数据状态，非阈值结果） */
+export type HealthTone = WindowTone | "stale";
 
 export type DataState =
   | "initial-loading"
@@ -29,6 +32,8 @@ export interface QuotaWindowView {
   kind: WindowKind;
   label: string;
   usedPercent: number;
+  /** Core 按用户阈值计算的档位；前端不得自行用百分比比较阈值 */
+  tone: WindowTone;
   /** ISO8601；null 表示上游未提供，UI 必须显示"重置时间未知"（§8.3） */
   resetsAt: string | null;
 }

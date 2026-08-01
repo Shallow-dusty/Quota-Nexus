@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  THRESHOLD_CRITICAL,
-  THRESHOLD_HIGH,
-  THRESHOLD_WARNING,
   attentionWindowCount,
   clampPercent,
   healthyAccountCount,
@@ -10,9 +7,22 @@ import {
   remainingPercent,
   sortByRisk,
   toneForAccount,
-  toneForPercent,
 } from "./quota-logic";
-import type { ServiceQuotaView } from "./quota-types";
+import type { QuotaWindowView, ServiceQuotaView, WindowTone } from "./quota-types";
+
+const win = (
+  usedPercent: number,
+  tone: WindowTone,
+  over: Partial<QuotaWindowView> = {},
+): QuotaWindowView => ({
+  id: over.id ?? "w",
+  kind: "weekly",
+  label: "W",
+  usedPercent,
+  tone,
+  resetsAt: null,
+  ...over,
+});
 
 const account = (over: Partial<ServiceQuotaView>): ServiceQuotaView => ({
   id: "a",
@@ -40,32 +50,13 @@ describe("百分比与剩余", () => {
   });
 });
 
-describe("健康档位（DESIGN §10.1 三级阈值）", () => {
-  it("低于 Warning 为 normal", () => {
-    expect(toneForPercent(69.9)).toBe("normal");
-  });
-  it("≥70 为 warning", () => {
-    expect(toneForPercent(THRESHOLD_WARNING)).toBe("warning");
-  });
-  it("≥85 为 high", () => {
-    expect(toneForPercent(THRESHOLD_HIGH)).toBe("high");
-    expect(toneForPercent(90)).toBe("high");
-  });
-  it("≥95 为 critical", () => {
-    expect(toneForPercent(THRESHOLD_CRITICAL)).toBe("critical");
-  });
-});
-
-describe("账号健康与排序", () => {
-  it("取最高档位，且 stale-with-error 优先为陈旧", () => {
+describe("账号健康与排序（档位由 Core 下发）", () => {
+  it("取全部窗口中的最高档位，stale-with-error 优先为陈旧", () => {
     expect(
       toneForAccount(
         account({
           state: "ready",
-          windows: [
-            { id: "w", kind: "monthly", label: "M", usedPercent: 30, resetsAt: null },
-            { id: "w2", kind: "weekly", label: "W", usedPercent: 99, resetsAt: null },
-          ],
+          windows: [win(30, "normal"), win(99, "critical", { id: "w2" })],
         }),
       ),
     ).toBe("critical");
@@ -75,24 +66,20 @@ describe("账号健康与排序", () => {
 
   it("最高风险窗口不来自陈旧账号", () => {
     const accounts = [
-      account({ id: "stale", state: "stale-with-error", windows: [
-        { id: "w", kind: "monthly", label: "M", usedPercent: 99, resetsAt: null },
-      ] }),
-      account({ id: "ok", windows: [
-        { id: "w", kind: "weekly", label: "W", usedPercent: 72, resetsAt: null },
-      ] }),
+      account({
+        id: "stale",
+        state: "stale-with-error",
+        windows: [win(99, "critical")],
+      }),
+      account({ id: "ok", windows: [win(72, "warning")] }),
     ];
     expect(highestWindow(accounts)?.account.id).toBe("ok");
   });
 
   it("按风险排序：critical 在 warning 之前", () => {
     const accounts = [
-      account({ id: "warn", windows: [
-        { id: "w", kind: "weekly", label: "W", usedPercent: 72, resetsAt: null },
-      ] }),
-      account({ id: "crit", windows: [
-        { id: "w", kind: "monthly", label: "M", usedPercent: 99, resetsAt: null },
-      ] }),
+      account({ id: "warn", windows: [win(72, "warning")] }),
+      account({ id: "crit", windows: [win(99, "critical")] }),
     ];
     expect(sortByRisk(accounts).map((a) => a.id)).toEqual(["crit", "warn"]);
   });
@@ -101,15 +88,13 @@ describe("账号健康与排序", () => {
 describe("摘要统计", () => {
   it("需关注窗口数与正常账号数", () => {
     const accounts = [
-      account({ id: "ok", windows: [
-        { id: "w", kind: "weekly", label: "W", usedPercent: 40, resetsAt: null },
-      ] }),
-      account({ id: "warn", windows: [
-        { id: "w", kind: "weekly", label: "W", usedPercent: 72, resetsAt: null },
-      ] }),
-      account({ id: "stale", state: "stale-with-error", windows: [
-        { id: "w", kind: "weekly", label: "W", usedPercent: 99, resetsAt: null },
-      ] }),
+      account({ id: "ok", windows: [win(40, "normal")] }),
+      account({ id: "warn", windows: [win(72, "warning")] }),
+      account({
+        id: "stale",
+        state: "stale-with-error",
+        windows: [win(99, "critical")],
+      }),
     ];
     expect(attentionWindowCount(accounts)).toBe(1);
     expect(healthyAccountCount(accounts)).toBe(1);

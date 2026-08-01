@@ -1028,12 +1028,13 @@ mod tests {
                 freshness: "fresh".into(),
                 last_success_at: Some("2026-07-31T00:00:00Z".into()),
                 error_category: None,
-                windows: vec![crate::domain::QuotaWindowView {
+                windows: vec![crate::domain::TonedQuotaWindow {
                     id: "weekly".into(),
                     kind: "weekly".into(),
                     label: "周额度".into(),
                     used_percent: 42.0,
                     resets_at: None,
+                    tone: "normal".into(),
                 }],
             }],
             refreshed_at: Some("2026-07-31T00:00:00Z".into()),
@@ -1062,12 +1063,13 @@ mod tests {
                 freshness: "fresh".into(),
                 last_success_at: Some("2026-07-31T00:00:00Z".into()),
                 error_category: None,
-                windows: vec![crate::domain::QuotaWindowView {
+                windows: vec![crate::domain::TonedQuotaWindow {
                     id: "weekly".into(),
                     kind: "weekly".into(),
                     label: "周额度".into(),
                     used_percent: 27.0,
                     resets_at: None,
+                    tone: "normal".into(),
                 }],
             }],
             refreshed_at: Some("2026-07-31T00:00:00Z".into()),

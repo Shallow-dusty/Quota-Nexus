@@ -1,7 +1,7 @@
 import { Clock3 } from "lucide-react";
 import { QuotaProgress } from "../ui/quota-progress";
 import { formatPercent, formatResetCountdown } from "../../lib/format";
-import { clampPercent, remainingPercent, toneForPercent } from "../../lib/quota-logic";
+import { clampPercent, remainingPercent } from "../../lib/quota-logic";
 import type { QuotaWindowView } from "../../lib/quota-types";
 
 export function QuotaWindowRow({
@@ -13,7 +13,7 @@ export function QuotaWindowRow({
 }) {
   const used = clampPercent(window.usedPercent);
   const remaining = remainingPercent(used);
-  const tone = toneForPercent(used);
+  const tone = window.tone;
   const countdown = formatResetCountdown(window.resetsAt, now);
 
   return (

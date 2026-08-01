@@ -16,7 +16,7 @@ use crate::{
     domain::{
         AccountConnectionView, AppSettingsView, CredentialOptionView, HistoryPointView,
         NetworkProfileView, OverviewView, ProviderHealthView, QuotaWindowView, ServiceQuotaView,
-        UpdateSettingsInput,
+        TonedQuotaWindow, UpdateSettingsInput,
     },
     error::CommandError,
     network::NewNetworkProfile,
@@ -619,10 +619,15 @@ async fn windows_for(
 
 pub async fn overview(pool: &SqlitePool) -> Result<OverviewView, CommandError> {
     let rows = account_rows(pool).await?;
+    let app_settings = settings(pool).await?;
     let mut accounts = Vec::with_capacity(rows.len());
     let mut refreshed_at: Option<String> = None;
     for row in rows {
-        let windows = windows_for(pool, &row.id).await?;
+        let windows = windows_for(pool, &row.id)
+            .await?
+            .into_iter()
+            .map(|window| TonedQuotaWindow::from_window(window, &app_settings))
+            .collect();
         if row.last_success_at > refreshed_at {
             refreshed_at = row.last_success_at.clone();
         }

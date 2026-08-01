@@ -28,9 +28,9 @@ const clineMain: ServiceQuotaView = {
   freshness: "fresh",
   lastSuccessAt: new Date(NOW - 3 * 60_000).toISOString(),
   windows: [
-    { id: "five-hour", kind: "rolling_5h", label: "5 小时", usedPercent: 0, resetsAt: iso(5 * 3600) },
-    { id: "weekly", kind: "weekly", label: "周额度", usedPercent: 0, resetsAt: iso(3 * 86400) },
-    { id: "monthly", kind: "monthly", label: "月额度", usedPercent: 99, resetsAt: iso(11 * 86400) },
+    { id: "five-hour", kind: "rolling_5h", label: "5 小时", usedPercent: 0, tone: "normal", resetsAt: iso(5 * 3600) },
+    { id: "weekly", kind: "weekly", label: "周额度", usedPercent: 0, tone: "normal", resetsAt: iso(3 * 86400) },
+    { id: "monthly", kind: "monthly", label: "月额度", usedPercent: 99, tone: "critical", resetsAt: iso(11 * 86400) },
   ],
 };
 
@@ -43,9 +43,9 @@ const opencodeB: ServiceQuotaView = {
   freshness: "fresh",
   lastSuccessAt: new Date(NOW - 2 * 60_000).toISOString(),
   windows: [
-    { id: "rolling", kind: "rolling_5h", label: "5 小时", usedPercent: 0, resetsAt: iso(18000) },
-    { id: "weekly", kind: "weekly", label: "周额度", usedPercent: 86, resetsAt: iso(310816) },
-    { id: "monthly", kind: "monthly", label: "月额度", usedPercent: 44, resetsAt: iso(1797923) },
+    { id: "rolling", kind: "rolling_5h", label: "5 小时", usedPercent: 0, tone: "normal", resetsAt: iso(18000) },
+    { id: "weekly", kind: "weekly", label: "周额度", usedPercent: 86, tone: "high", resetsAt: iso(310816) },
+    { id: "monthly", kind: "monthly", label: "月额度", usedPercent: 44, tone: "normal", resetsAt: iso(1797923) },
   ],
 };
 
@@ -59,9 +59,9 @@ const opencodeA: ServiceQuotaView = {
   freshness: "fresh",
   lastSuccessAt: new Date(NOW - 2 * 60_000).toISOString(),
   windows: [
-    { id: "rolling", kind: "rolling_5h", label: "5 小时", usedPercent: 12, resetsAt: iso(15840) },
-    { id: "weekly", kind: "weekly", label: "周额度", usedPercent: 72, resetsAt: iso(284400) },
-    { id: "monthly", kind: "monthly", label: "月额度", usedPercent: 30, resetsAt: iso(1640000) },
+    { id: "rolling", kind: "rolling_5h", label: "5 小时", usedPercent: 12, tone: "normal", resetsAt: iso(15840) },
+    { id: "weekly", kind: "weekly", label: "周额度", usedPercent: 72, tone: "warning", resetsAt: iso(284400) },
+    { id: "monthly", kind: "monthly", label: "月额度", usedPercent: 30, tone: "normal", resetsAt: iso(1640000) },
   ],
 };
 
@@ -75,8 +75,8 @@ const ollamaPro: ServiceQuotaView = {
   freshness: "fresh",
   lastSuccessAt: new Date(NOW - 4 * 60_000).toISOString(),
   windows: [
-    { id: "session", kind: "session", label: "Session", usedPercent: 0.6, resetsAt: iso(4 * 3600) },
-    { id: "weekly", kind: "weekly", label: "Weekly", usedPercent: 48.3, resetsAt: iso(3.4 * 86400) },
+    { id: "session", kind: "session", label: "Session", usedPercent: 0.6, tone: "normal", resetsAt: iso(4 * 3600) },
+    { id: "weekly", kind: "weekly", label: "Weekly", usedPercent: 48.3, tone: "normal", resetsAt: iso(3.4 * 86400) },
   ],
 };
 
@@ -92,8 +92,8 @@ const ollamaFreeStale: ServiceQuotaView = {
   lastSuccessAt: new Date(NOW - 2 * 3600_000).toISOString(),
   errorCategory: "auth",
   windows: [
-    { id: "session", kind: "session", label: "Session", usedPercent: 33, resetsAt: iso(2.2 * 3600) },
-    { id: "weekly", kind: "weekly", label: "Weekly", usedPercent: 61, resetsAt: iso(1.8 * 86400) },
+    { id: "session", kind: "session", label: "Session", usedPercent: 33, tone: "normal", resetsAt: iso(2.2 * 3600) },
+    { id: "weekly", kind: "weekly", label: "Weekly", usedPercent: 61, tone: "normal", resetsAt: iso(1.8 * 86400) },
   ],
 };
 

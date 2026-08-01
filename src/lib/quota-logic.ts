@@ -4,22 +4,9 @@ import type {
   ServiceQuotaView,
 } from "./quota-types";
 
-/** DESIGN.md §10.1 默认告警阈值（已用百分比） */
-export const THRESHOLD_WARNING = 70;
-export const THRESHOLD_HIGH = 85;
-export const THRESHOLD_CRITICAL = 95;
-
 export function clampPercent(value: number): number {
   if (Number.isNaN(value)) return 0;
   return Math.min(100, Math.max(0, value));
-}
-
-export function toneForPercent(value: number): HealthTone {
-  const percent = clampPercent(value);
-  if (percent >= THRESHOLD_CRITICAL) return "critical";
-  if (percent >= THRESHOLD_HIGH) return "high";
-  if (percent >= THRESHOLD_WARNING) return "warning";
-  return "normal";
 }
 
 const TONE_RANK: Record<HealthTone, number> = {
@@ -30,14 +17,13 @@ const TONE_RANK: Record<HealthTone, number> = {
   critical: 4,
 };
 
-/** 账号健康 = 全部窗口中的最高档位；陈旧/错误状态直接标记 stale（§11.3 最危险优先） */
+/** 账号健康 = 全部窗口中的最高档位（档位由 Core 下发）；陈旧/暂停状态直接标记 stale */
 export function toneForAccount(account: ServiceQuotaView): HealthTone {
   if (account.state === "stale-with-error" || account.state === "paused") {
     return "stale";
   }
   return account.windows.reduce<HealthTone>((highest, window) => {
-    const tone = toneForPercent(window.usedPercent);
-    return TONE_RANK[tone] > TONE_RANK[highest] ? tone : highest;
+    return TONE_RANK[window.tone] > TONE_RANK[highest] ? window.tone : highest;
   }, "normal");
 }
 
@@ -56,12 +42,12 @@ export function highestWindow(accounts: ServiceQuotaView[]): {
   );
 }
 
-/** 需关注窗口数：达到 Warning 档及以上的窗口（不含陈旧账号） */
+/** 需关注窗口数：档位达到 Warning 及以上的窗口（不含陈旧账号） */
 export function attentionWindowCount(accounts: ServiceQuotaView[]): number {
   return accounts
     .filter((a) => !["stale-with-error", "paused"].includes(a.state))
     .flatMap((a) => a.windows)
-    .filter((w) => w.usedPercent >= THRESHOLD_WARNING).length;
+    .filter((w) => w.tone !== "normal").length;
 }
 
 /** 健康账号数：无错误状态且最高窗口低于 Warning */

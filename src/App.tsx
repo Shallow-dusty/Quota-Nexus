@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/shell/app-shell";
 import { ToastProvider } from "./components/ui/toast";
+import { ThresholdsProvider } from "./lib/thresholds";
 import { AccountsPage } from "./pages/accounts-page";
 import { OverviewPage } from "./pages/overview-page";
 import { SettingsPage } from "./pages/settings-page";
@@ -51,7 +52,8 @@ export function App() {
 
   return (
     <ToastProvider>
-      <AppShell
+      <ThresholdsProvider>
+        <AppShell
         page={page}
         collapsed={collapsed}
         onPageChange={setPage}
@@ -68,7 +70,8 @@ export function App() {
             onPrivacyChange={applyPrivacy}
           />
         )}
-      </AppShell>
+        </AppShell>
+      </ThresholdsProvider>
     </ToastProvider>
   );
 }
