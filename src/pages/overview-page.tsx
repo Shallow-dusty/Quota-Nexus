@@ -11,6 +11,7 @@ import { SegmentedControl } from "../components/ui/segmented";
 import { SkeletonCard } from "../components/ui/skeleton";
 import { AccountDetailDrawer } from "../components/quota/account-detail-drawer";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
+import { ServiceQuotaRow } from "../components/quota/service-quota-row";
 import { SummaryStrip } from "../components/quota/summary-strip";
 import { StableSurface } from "../components/ui/surface";
 
@@ -31,6 +32,11 @@ export function OverviewPage({
     "aiqm.overview-sort",
     ["risk", "name", "provider"] as const,
     "risk",
+  );
+  const [view, setView] = useLocalPref<"grid" | "list">(
+    "aiqm.overview-view",
+    ["grid", "list"] as const,
+    "grid",
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -198,6 +204,14 @@ export function OverviewPage({
               <option value="name">名称</option>
               <option value="provider">供应商</option>
             </select>
+            <SegmentedControl
+              value={view}
+              onChange={setView}
+              options={[
+                { id: "grid", label: "网格" },
+                { id: "list", label: "列表" },
+              ]}
+            />
           </div>
         )}
 
@@ -211,6 +225,18 @@ export function OverviewPage({
           <EmptyOverview onPageChange={onPageChange} />
         ) : accounts && visible.length === 0 ? (
           <FilterEmpty onClear={() => setFilter("all")} />
+        ) : accounts && view === "list" ? (
+          <div className="quota-list flex flex-col gap-2.5">
+            {visible.map((account) => (
+              <ServiceQuotaRow
+                key={account.id}
+                account={account}
+                refreshing={cardRefreshing === account.id}
+                onRefresh={refreshAccount}
+                onOpen={setDetailId}
+              />
+            ))}
+          </div>
         ) : accounts ? (
           <Grid>
             {visible.map((account) => (

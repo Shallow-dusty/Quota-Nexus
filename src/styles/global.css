@@ -885,6 +885,62 @@ body {
   border-color: var(--line-strong);
 }
 
+/* 列表视图的紧凑账号行 */
+.quota-row {
+  cursor: pointer;
+}
+
+.quota-row:hover {
+  border-color: var(--line-strong);
+}
+
+.quota-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.quota-row-id {
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.quota-row-window {
+  flex: 1 1 0;
+  max-width: 190px;
+}
+
+.quota-row-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.quota-row-track > div {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fill-normal);
+  transition: width var(--dur-med) var(--ease);
+}
+
+.quota-row-track[data-tone="warning"] > div { background: var(--fill-warn); }
+.quota-row-track[data-tone="high"] > div { background: var(--fill-high); }
+.quota-row-track[data-tone="critical"] > div { background: var(--fill-crit); }
+
+@media (max-width: 900px) {
+  .quota-row {
+    flex-wrap: wrap;
+  }
+  .quota-row-id {
+    width: auto;
+    flex: 1;
+  }
+  .quota-row-windows {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
 .quota-card-header {
   min-height: 38px;
 }

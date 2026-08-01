@@ -10,6 +10,7 @@ const shots = [
   { name: "overview-solid", theme: "light", transparency: "off", width: 1440, height: 900, page: "overview" },
   { name: "overview-private", theme: "light", privacy: "on", width: 1440, height: 900, page: "overview" },
   { name: "overview-high-contrast", theme: "light", forcedColors: "active", width: 1440, height: 900, page: "overview" },
+  { name: "overview-list", theme: "light", width: 1440, height: 900, page: "overview", listView: true },
   { name: "overview-960", theme: "light", width: 960, height: 640, page: "overview" },
   { name: "overview-640", theme: "light", width: 640, height: 720, page: "overview" },
   { name: "accounts-light", theme: "light", width: 1440, height: 900, page: "accounts" },
@@ -65,6 +66,9 @@ page.on("pageerror", (error) => browserProblems.push(`PAGE ERROR: ${error.messag
 // Vite keeps its HMR connection alive in development, so networkidle is not a
 // meaningful readiness signal. The visible app heading below is the contract.
 await page.goto("http://127.0.0.1:1420/", { waitUntil: "domcontentloaded" });
+// 视图/排序偏好经 localStorage 持久化，先清零保证场景间确定性
+await page.evaluate(() => window.localStorage.clear());
+await page.reload({ waitUntil: "domcontentloaded" });
 await page.getByRole("heading", { name: "概览" }).waitFor({ state: "visible" });
 
 for (const shot of shots) {
@@ -103,7 +107,16 @@ for (const shot of shots) {
     await page.getByText("新建固定代理", { exact: true }).click();
     await page.getByPlaceholder("socks5h://host:port").waitFor();
   }
+  if (shot.listView) {
+    await page.locator(".quota-card").first().waitFor({ state: "visible" });
+    await page.getByRole("radio", { name: "列表" }).click();
+    await page.locator(".quota-row").first().waitFor({ state: "visible" });
+  }
   if (shot.history) {
+    // 列表视图场景会持久化视图偏好；等数据就位后先切回网格
+    await page.locator(".quota-card, .quota-row").first().waitFor({ state: "visible" });
+    const gridRadio = page.getByRole("radio", { name: "网格" });
+    if (await gridRadio.count()) await gridRadio.click();
     await page.locator(".quota-card").first().click();
     await page.getByRole("dialog", { name: /账号详情/ }).waitFor();
     await page.getByText("额度趋势等效数据表").waitFor({ state: "attached" });
