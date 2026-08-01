@@ -1,5 +1,4 @@
 import {
-  Check,
   KeyRound,
   Pause,
   Pencil,
@@ -8,7 +7,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { Button } from "react-aria-components";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { formatDateTime, formatRelativePast } from "../lib/format";
@@ -17,11 +16,16 @@ import type { AccountConnectionView, ProviderKind } from "../lib/quota-types";
 import { useNow } from "../lib/use-now";
 import { PageHeader } from "../components/shell/app-shell";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
-import { FloatingGlass, StableSurface } from "../components/ui/surface";
+import { StableSurface } from "../components/ui/surface";
 import { useToast } from "../components/ui/toast";
 import { PausedBadge, PlanBadge, StatusBadge } from "../components/ui/status-badge";
 import { ProviderMark } from "../components/quota/provider-mark";
 import { AddAccountDialog } from "../components/quota/add-account-dialog";
+import { AccountDetailDrawer } from "../components/quota/account-detail-drawer";
+import {
+  EditAccountDialog,
+  UpdateCredentialDialog,
+} from "../components/quota/account-dialogs";
 
 export function AccountsPage() {
   const now = useNow();
@@ -33,6 +37,7 @@ export function AccountsPage() {
   const [credentialAccount, setCredentialAccount] =
     useState<AccountConnectionView | null>(null);
   const [deleting, setDeleting] = useState<AccountConnectionView | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const toast = useToast();
 
   async function reload() {
@@ -101,6 +106,7 @@ export function AccountsPage() {
               connection={connection}
               now={now}
               busy={busyId === connection.id}
+              onOpen={() => setDetailId(connection.id)}
               onVerify={() =>
                 act(connection.id, () => quotaClient.refreshAccount(connection.id))
               }
@@ -176,6 +182,13 @@ export function AccountsPage() {
           toast.success("凭据已更新");
         }}
       />
+      <AccountDetailDrawer
+        accountId={detailId}
+        onClose={() => setDetailId(null)}
+        onChanged={() =>
+          void reload().catch((reason) => setLoadError(commandErrorMessage(reason)))
+        }
+      />
     </>
   );
 }
@@ -184,6 +197,7 @@ function ConnectionRow({
   connection,
   now,
   busy,
+  onOpen,
   onVerify,
   onToggle,
   onEdit,
@@ -193,6 +207,7 @@ function ConnectionRow({
   connection: AccountConnectionView;
   now: number;
   busy: boolean;
+  onOpen: () => void;
   onVerify: () => void;
   onToggle: () => void;
   onEdit: () => void;
@@ -221,7 +236,19 @@ function ConnectionRow({
           : "仅手动刷新";
 
   return (
-    <StableSurface className="connection-row px-4 py-3.5 flex items-center gap-3.5">
+    <StableSurface
+      className="connection-row px-4 py-3.5 flex items-center gap-3.5"
+      role="button"
+      tabIndex={0}
+      aria-label={`查看账号详情：${connection.accountLabel}`}
+      onClick={onOpen}
+      onKeyDown={(event: React.KeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       <ProviderMark provider={connection.provider} size={32} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -255,7 +282,10 @@ function ConnectionRow({
         </span>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div
+        className="flex items-center gap-1 shrink-0"
+        onClick={(event) => event.stopPropagation()}
+      >
         <Button
           className="btn btn-icon"
           onPress={onVerify}
@@ -301,155 +331,6 @@ function ConnectionRow({
         </Button>
       </div>
     </StableSurface>
-  );
-}
-
-function EditAccountDialog({
-  account,
-  onClose,
-  onSaved,
-}: {
-  account: AccountConnectionView | null;
-  onClose: () => void;
-  onSaved: (connections: AccountConnectionView[]) => void;
-}) {
-  const [label, setLabel] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => setLabel(account?.accountLabel ?? ""), [account]);
-  return (
-    <ModalOverlay
-      isOpen={account !== null}
-      onOpenChange={(open) => !open && onClose()}
-      isDismissable
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(15,18,26,.32)] backdrop-blur-[3px]"
-    >
-      <Modal>
-        <Dialog aria-label="编辑账号" className="outline-none">
-          <FloatingGlass className="w-[390px] max-w-full p-5">
-            <h2 className="text-[15px] font-semibold text-ink-1">编辑账号</h2>
-            <input
-              autoFocus
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
-              className="mt-4 w-full px-2.5 h-9 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[rgba(127,141,168,.06)] border border-[var(--line)] outline-none focus:border-[var(--accent)]"
-            />
-            {error && <p className="mt-2 text-[11px] text-[var(--danger)]">{error}</p>}
-            <div className="mt-5 flex justify-end gap-2">
-              <Button className="btn btn-outline" onPress={onClose}>取消</Button>
-              <Button
-                className="btn btn-accent"
-                isDisabled={saving || !label.trim()}
-                onPress={async () => {
-                  if (!account) return;
-                  setSaving(true);
-                  setError(null);
-                  try {
-                    onSaved(
-                      await quotaClient.updateAccount({
-                        id: account.id,
-                        label,
-                        enabled: account.enabled,
-                      }),
-                    );
-                  } catch (reason) {
-                    setError(commandErrorMessage(reason));
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <Check size={14} /> {saving ? "保存中…" : "保存"}
-              </Button>
-            </div>
-          </FloatingGlass>
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
-  );
-}
-
-function UpdateCredentialDialog({
-  account,
-  onClose,
-  onSaved,
-}: {
-  account: AccountConnectionView | null;
-  onClose: () => void;
-  onSaved: (connections: AccountConnectionView[]) => void;
-}) {
-  const [secret, setSecret] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    setSecret("");
-    setError(null);
-  }, [account]);
-  return (
-    <ModalOverlay
-      isOpen={account !== null}
-      onOpenChange={(open) => !open && onClose()}
-      isDismissable
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(15,18,26,.32)] backdrop-blur-[3px]"
-    >
-      <Modal>
-        <Dialog aria-label="更新凭据" className="outline-none">
-          <FloatingGlass className="w-[430px] max-w-full p-5">
-            <h2 className="text-[15px] font-semibold text-ink-1">更新凭据</h2>
-            <p className="mt-1 text-[11.5px] text-ink-3">
-              {account?.sharedAccountCount && account.sharedAccountCount > 1
-                ? `该凭据被 ${account.sharedAccountCount} 个账号共享，更新后将同时恢复。`
-                : "验证通过后才会替换旧凭据。"}
-            </p>
-            <textarea
-              autoFocus
-              rows={4}
-              value={secret}
-              onChange={(event) => setSecret(event.target.value)}
-              placeholder={
-                account?.provider === "clinepass"
-                  ? "粘贴新的 API Key 或 Authorization 请求头"
-                  : account?.provider === "ollama-cloud"
-                    ? "粘贴新的 API Key（推荐）或兼容 Cookie"
-                    : "粘贴新的 Cookie 或 Firefox 请求头 JSON"
-              }
-              className="mt-4 w-full px-2.5 py-2 rounded-[var(--r-md)] text-[12.5px] text-ink-1 bg-[rgba(127,141,168,.06)] border border-[var(--line)] outline-none focus:border-[var(--accent)] resize-none"
-            />
-            <p className="mt-2 text-[11px] text-ink-3">
-              可直接粘贴请求头 JSON；应用会自动提取所需字段。
-            </p>
-            {error && <p className="mt-2 text-[11px] text-[var(--danger)]">{error}</p>}
-            <div className="mt-5 flex justify-end gap-2">
-              <Button className="btn btn-outline" onPress={onClose}>取消</Button>
-              <Button
-                className="btn btn-accent"
-                isDisabled={saving || !secret.trim()}
-                onPress={async () => {
-                  if (!account) return;
-                  setSaving(true);
-                  setError(null);
-                  try {
-                    onSaved(
-                      await quotaClient.updateCredential({
-                        credentialId: account.credentialId,
-                        secret,
-                      }),
-                    );
-                    setSecret("");
-                  } catch (reason) {
-                    setError(commandErrorMessage(reason));
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <KeyRound size={14} /> {saving ? "验证中…" : "验证并更新"}
-              </Button>
-            </div>
-          </FloatingGlass>
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
   );
 }
 

@@ -104,9 +104,9 @@ for (const shot of shots) {
     await page.getByPlaceholder("socks5h://host:port").waitFor();
   }
   if (shot.history) {
-    await page.getByRole("button", { name: "展开" }).click();
+    await page.locator(".quota-card").first().click();
+    await page.getByRole("dialog", { name: /账号详情/ }).waitFor();
     await page.getByText("额度趋势等效数据表").waitFor({ state: "attached" });
-    await page.getByRole("heading", { name: "额度趋势" }).scrollIntoViewIfNeeded();
   }
   if (shot.bottom) {
     await page.locator(".page-scroll").evaluate((element) => {

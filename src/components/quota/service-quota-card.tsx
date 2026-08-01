@@ -1,38 +1,25 @@
-import { MoreHorizontal, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "react-aria-components";
 import { formatDateTime } from "../../lib/format";
+import { ERROR_HINT, ERROR_LABEL } from "../../lib/quota-copy";
 import { toneForAccount } from "../../lib/quota-logic";
-import type { ErrorCategory, ServiceQuotaView } from "../../lib/quota-types";
+import type { ServiceQuotaView } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
 import { StableSurface } from "../ui/surface";
 import { PausedBadge, PlanBadge, StatusBadge } from "../ui/status-badge";
 import { ProviderMark } from "./provider-mark";
 import { QuotaWindowRow } from "./quota-window-row";
 
-const ERROR_LABEL: Record<ErrorCategory, string> = {
-  auth: "认证失效，请更新凭据",
-  network: "网络错误，显示最后成功数据",
-  parser: "上游结构变化，解析失败",
-  proxy: "固定出口不可达",
-};
-
-const ERROR_HINT: Record<ErrorCategory, string> = {
-  auth: "该账号已暂停自动刷新",
-  network: "保留上次额度，待恢复后刷新",
-  parser: "供应商级熔断，等待解析修复",
-  proxy: "已停止，未回退默认出口",
-};
-
 export function ServiceQuotaCard({
   account,
   refreshing,
   onRefresh,
-  onMore,
+  onOpen,
 }: {
   account: ServiceQuotaView;
   refreshing?: boolean;
   onRefresh?: (id: string) => void;
-  onMore?: (id: string) => void;
+  onOpen?: (id: string) => void;
 }) {
   const now = useNow();
   const tone = toneForAccount(account);
@@ -40,7 +27,19 @@ export function ServiceQuotaCard({
   const paused = account.state === "paused";
 
   return (
-    <StableSurface className="quota-card p-4 flex flex-col gap-3">
+    <StableSurface
+      className="quota-card p-4 flex flex-col gap-3"
+      role="button"
+      tabIndex={0}
+      aria-label={`查看账号详情：${account.accountLabel}`}
+      onClick={() => onOpen?.(account.id)}
+      onKeyDown={(event: React.KeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen?.(account.id);
+        }
+      }}
+    >
       <div className="quota-card-header flex items-start gap-3">
         <ProviderMark provider={account.provider} size={32} />
         <div className="min-w-0 flex-1">
@@ -81,7 +80,7 @@ export function ServiceQuotaCard({
           上次成功 {formatDateTime(account.lastSuccessAt)}
           {account.freshness === "fresh" ? " · 数据新鲜" : " · 数据陈旧"}
         </span>
-        <div className="flex items-center gap-1">
+        <div onClick={(event) => event.stopPropagation()}>
           <Button
             onPress={() => onRefresh?.(account.id)}
             isDisabled={refreshing || paused || account.errorCategory === "auth"}
@@ -91,17 +90,8 @@ export function ServiceQuotaCard({
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
           </Button>
-          <Button
-            onPress={() => onMore?.(account.id)}
-            className="btn btn-icon"
-            aria-label="更多操作"
-            data-tooltip="在账号与连接中管理"
-          >
-            <MoreHorizontal size={15} />
-          </Button>
         </div>
       </div>
     </StableSurface>
   );
 }
-

@@ -8,10 +8,10 @@ import type { PageId, ServiceQuotaView } from "../lib/quota-types";
 import { PageHeader } from "../components/shell/app-shell";
 import { SegmentedControl } from "../components/ui/segmented";
 import { SkeletonCard } from "../components/ui/skeleton";
+import { AccountDetailDrawer } from "../components/quota/account-detail-drawer";
 import { ServiceQuotaCard } from "../components/quota/service-quota-card";
 import { SummaryStrip } from "../components/quota/summary-strip";
 import { StableSurface } from "../components/ui/surface";
-import { HistoryTrend } from "../components/quota/history-trend";
 
 type Filter = "all" | "attention" | "stale";
 
@@ -27,6 +27,7 @@ export function OverviewPage({
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const toast = useToast();
 
   // Rust Core 是唯一刷新时钟；页面只接收首屏 DTO 与后续 overview-updated 事件。
@@ -82,6 +83,17 @@ export function OverviewPage({
     });
     return sortByRisk(filtered);
   }, [accounts, filter]);
+
+  async function reload() {
+    try {
+      const data = await quotaClient.getOverview();
+      setAccounts(data.accounts);
+      setRefreshedAt(data.refreshedAt);
+      setSource(data.source);
+    } catch (reason) {
+      setLoadError(commandErrorMessage(reason));
+    }
+  }
 
   async function refreshAll() {
     setRefreshing(true);
@@ -186,7 +198,7 @@ export function OverviewPage({
                 account={account}
                 refreshing={cardRefreshing === account.id}
                 onRefresh={refreshAccount}
-                onMore={() => onPageChange("accounts")}
+                onOpen={setDetailId}
               />
             ))}
           </Grid>
@@ -197,8 +209,13 @@ export function OverviewPage({
             演示数据（浏览器预览模式）
           </div>
         )}
-        <HistoryTrend />
       </div>
+
+      <AccountDetailDrawer
+        accountId={detailId}
+        onClose={() => setDetailId(null)}
+        onChanged={() => void reload()}
+      />
     </>
   );
 }

@@ -1,97 +1,56 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "react-aria-components";
-import { History } from "lucide-react";
 import { commandErrorMessage, quotaClient } from "../../lib/quota-client";
 import type { HistoryPointView } from "../../lib/quota-types";
 import { SegmentedControl } from "../ui/segmented";
-import { StableSurface } from "../ui/surface";
 
 type HistoryDays = 7 | 30 | 90;
 
-export function HistoryTrend() {
+/** 单账号额度趋势（详情抽屉内）：本机历史快照折线，按窗口类型分组。 */
+export function AccountTrend({ accountId }: { accountId: string }) {
   const [days, setDays] = useState<HistoryDays>(30);
-  const [expanded, setExpanded] = useState(false);
-  const [points, setPoints] = useState<HistoryPointView[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState("");
+  const [points, setPoints] = useState<HistoryPointView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!expanded) return;
     let active = true;
-    setLoading(true);
+    setPoints(null);
     setError(null);
     void quotaClient
       .getHistory(days)
       .then((data) => {
         if (!active) return;
-        setPoints(data);
-        setSelectedAccount((current) =>
-          data.some((point) => point.accountId === current)
-            ? current
-            : (data[0]?.accountId ?? ""),
-        );
+        setPoints(data.filter((point) => point.accountId === accountId));
       })
-      .catch((reason) => active && setError(commandErrorMessage(reason)))
-      .finally(() => active && setLoading(false));
+      .catch((reason) => active && setError(commandErrorMessage(reason)));
     return () => {
       active = false;
     };
-  }, [days, expanded]);
-
-  const accountOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    points.forEach((point) => seen.set(point.accountId, point.accountLabel));
-    return [...seen.entries()];
-  }, [points]);
-  const selected = points.filter((point) => point.accountId === selectedAccount);
+  }, [days, accountId]);
 
   return (
-    <StableSurface className="mt-5 overflow-hidden">
-      <div className="px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <History size={14} className="text-ink-3" />
-          <h2 className="text-[13px] font-semibold text-ink-1">额度趋势</h2>
-        </div>
-        <Button className="btn btn-outline" onPress={() => setExpanded((value) => !value)}>
-          {expanded ? "收起" : "展开"}
-        </Button>
+    <section aria-label="额度趋势">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="text-[13px] font-semibold text-ink-1">额度趋势</h3>
+        <SegmentedControl
+          value={String(days)}
+          onChange={(value) => setDays(Number(value) as HistoryDays)}
+          options={[
+            { id: "7", label: "7 天" },
+            { id: "30", label: "30 天" },
+            { id: "90", label: "90 天" },
+          ]}
+        />
       </div>
-      {expanded && (
-        <div className="border-t border-[var(--line)] px-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <select
-              aria-label="趋势账号"
-              value={selectedAccount}
-              onChange={(event) => setSelectedAccount(event.target.value)}
-              className="h-8 max-w-[260px] rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-2.5 text-[12px] text-ink-1"
-            >
-              {accountOptions.map(([id, label]) => (
-                <option key={id} value={id}>{label}</option>
-              ))}
-            </select>
-            <SegmentedControl
-              value={String(days)}
-              onChange={(value) => setDays(Number(value) as HistoryDays)}
-              options={[
-                { id: "7", label: "7 天" },
-                { id: "30", label: "30 天" },
-                { id: "90", label: "90 天" },
-              ]}
-            />
-          </div>
-          {loading ? (
-            <p className="py-10 text-center text-[12px] text-ink-3">正在读取历史…</p>
-          ) : error ? (
-            <p className="py-8 text-center text-[12px] text-[var(--danger)]">{error}</p>
-          ) : selected.length === 0 ? (
-            <p className="py-10 text-center text-[12px] text-ink-3">所选范围暂无历史数据</p>
-          ) : (
-            <TrendPlot points={selected} />
-          )}
-        </div>
+      {error ? (
+        <p className="py-8 text-center text-[12px] text-[var(--danger)]">{error}</p>
+      ) : points === null ? (
+        <p className="py-10 text-center text-[12px] text-ink-3">正在读取历史…</p>
+      ) : points.length === 0 ? (
+        <p className="py-10 text-center text-[12px] text-ink-3">所选范围暂无历史数据</p>
+      ) : (
+        <TrendPlot points={points} />
       )}
-    </StableSurface>
+    </section>
   );
 }
 

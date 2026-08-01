@@ -858,8 +858,15 @@ body {
 .quota-card {
   min-height: 312px;
   overflow: hidden;
+  cursor: pointer;
   backdrop-filter: blur(10px) saturate(1.03);
   -webkit-backdrop-filter: blur(10px) saturate(1.03);
+}
+
+.quota-card:focus-visible,
+.connection-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .quota-card:hover {
@@ -867,6 +874,14 @@ body {
   box-shadow:
     inset 0 1px 0 var(--stable-border),
     0 13px 32px rgba(39, 48, 42, 0.085);
+}
+
+.connection-row {
+  cursor: pointer;
+}
+
+.connection-row:hover {
+  border-color: var(--line-strong);
 }
 
 .quota-card-header {
@@ -1093,6 +1108,71 @@ input:checked ~ .toggle-thumb {
     );
   background-size: 200% 100%;
   animation: skeleton-sweep 1.4s var(--ease) infinite;
+}
+
+/* 账号详情抽屉（右侧滑入的详情层） */
+.drawer-backdrop {
+  background: rgba(15, 18, 26, 0.32);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+.drawer-panel {
+  width: min(440px, 94vw);
+  background: var(--floating-bg);
+  border-left: 1px solid var(--floating-border);
+  box-shadow: -24px 0 64px rgba(28, 34, 30, 0.18);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  animation: drawer-in var(--dur-med) var(--ease);
+}
+
+.drawer-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.drawer-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drawer-meta dt {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.drawer-meta dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-1);
+  overflow-wrap: anywhere;
+}
+
+.drawer-delete {
+  color: var(--crit);
+}
+
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-panel { animation: none; }
+}
+
+:root[data-transparency="off"] .drawer-panel {
+  background: var(--floating-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Toast 反馈（动作结果的瞬时提示） */
