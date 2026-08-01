@@ -29,12 +29,12 @@ export function OverviewPage({
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useLocalPref<AccountSortMode>(
-    "aiqm.overview-sort",
+    "qn.overview-sort",
     ["risk", "name", "provider"] as const,
     "risk",
   );
   const [view, setView] = useLocalPref<"grid" | "list">(
-    "aiqm.overview-view",
+    "qn.overview-view",
     ["grid", "list"] as const,
     "grid",
   );

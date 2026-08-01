@@ -1,3 +1,3 @@
 fn main() {
-    ai_quota_monitor_lib::run();
+    quota_nexus_lib::run();
 }

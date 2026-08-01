@@ -1,4 +1,4 @@
-//! AI Quota Monitor — Phase 0 只读探针共享基础设施。
+//! Quota Nexus — Phase 0 只读探针共享基础设施。
 //!
 //! 安全不变量（与 docs/DESIGN.md §4.1 一致）：
 //! - 仅允许 allowlist 内的 host / path / method，非 HTTPS 一律拒绝；

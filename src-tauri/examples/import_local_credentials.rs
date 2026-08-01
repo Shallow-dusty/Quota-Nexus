@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ai_quota_monitor_lib::local_import::{
+use quota_nexus_lib::local_import::{
     import_if_missing, CreateProviderAccountInput, RouteSelectionInput,
 };
 use serde::Deserialize;

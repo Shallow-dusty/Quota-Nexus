@@ -3,8 +3,8 @@ use zeroize::Zeroizing;
 
 use crate::error::CommandError;
 
-const SERVICE_PREFIX: &str = "AIQuotaMonitor/Credential";
-const NETWORK_SERVICE_PREFIX: &str = "AIQuotaMonitor/NetworkProfile";
+pub(crate) const SERVICE_PREFIX: &str = "QuotaNexus/Credential";
+pub(crate) const NETWORK_SERVICE_PREFIX: &str = "QuotaNexus/NetworkProfile";
 
 fn entry(prefix: &str, id: &str, username: &str) -> Result<Entry, CommandError> {
     Entry::new(&format!("{prefix}/{id}"), username)

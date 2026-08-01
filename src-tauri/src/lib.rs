@@ -3,6 +3,7 @@ mod commands;
 mod credential;
 mod domain;
 mod error;
+mod migrate;
 mod network;
 mod ollama;
 mod opencode;
@@ -85,8 +86,14 @@ pub fn run() {
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
-            let db_path = app_data_dir.join("ai-quota-monitor.sqlite3");
+            // 旧版（AI Quota Monitor）一次性迁移：SQLite 业务库 → 新 identifier 目录
+            if let Some(legacy_dir) = migrate::legacy_data_dir(&app_data_dir) {
+                migrate::migrate_legacy_data_dir(&app_data_dir, &legacy_dir);
+            }
+            let db_path = app_data_dir.join(migrate::DB_NAME);
             let db = tauri::async_runtime::block_on(storage::open(&db_path))?;
+            // WCM 秘密条目随 ID 清单搬到新服务名（best-effort）
+            tauri::async_runtime::block_on(migrate::migrate_legacy_wcm(&db));
             let settings = tauri::async_runtime::block_on(storage::settings_record(&db))?;
             if settings.autostart_enabled {
                 let _ = app.autolaunch().enable();
@@ -94,12 +101,12 @@ pub fn run() {
                 let _ = app.autolaunch().disable();
             }
             let tray_enabled = Arc::new(AtomicBool::new(settings.tray_enabled));
-            let show = MenuItem::with_id(app, "show", "显示 AI Quota Monitor", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "显示 Quota Nexus", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
             let tray = TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().expect("application icon").clone())
-                .tooltip("AI Quota Monitor")
+                .tooltip("Quota Nexus")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -162,7 +169,7 @@ pub fn run() {
             commands::refresh_account,
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run AI Quota Monitor");
+        .expect("failed to run Quota Nexus");
 }
 
 fn has_background_arg<I, S>(args: I) -> bool
@@ -190,11 +197,11 @@ mod tests {
     #[test]
     fn recognizes_only_explicit_background_startup() {
         assert!(has_background_arg([
-            OsString::from("ai-quota-monitor.exe"),
+            OsString::from("quota-nexus.exe"),
             OsString::from("--background"),
         ]));
         assert!(!has_background_arg([OsString::from(
-            "ai-quota-monitor.exe"
+            "quota-nexus.exe"
         )]));
     }
 }

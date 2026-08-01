@@ -1,6 +1,6 @@
 # Third-party notices
 
-AI Quota Monitor 本身采用 MIT License。依赖的完整版本以 `Cargo.lock` 和
+Quota Nexus 本身采用 MIT License。依赖的完整版本以 `Cargo.lock` 和
 `pnpm-lock.yaml` 为准；发布前通过依赖许可证清单复核。
 
 实现参考过以下社区项目公开描述和网络行为，但当前仓库没有直接复制其源文件：

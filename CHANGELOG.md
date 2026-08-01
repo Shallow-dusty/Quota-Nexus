@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+产品更名为 **Quota Nexus**（曾用名 AI Quota Monitor）：
+
+- identifier 变更为 `com.quotanexus.desktop`；首次启动自动迁移旧版的 SQLite 业务库、
+  Windows Credential Manager 秘密条目与数据库文件名，无需手动操作。
+
 交互与视觉重构（深度审核后的设计修正）：
 
 - 新增账号详情抽屉：概览卡片与账号行点击进入，聚合额度窗口、连接状态、

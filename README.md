@@ -1,15 +1,18 @@
-# AI Quota Monitor
+# Quota Nexus
 
-AI Quota Monitor 是一个 Windows 优先的本地额度面板，用同一套界面监控多个 OpenCode Go、
-Ollama Cloud 和 ClinePass 账号。当前版本聚焦额度采集、历史、告警和账号健康；架构保留继续
-扩展账号操作、客户端联动或请求路由的空间。
+**Quota Nexus is a Windows desktop dashboard that monitors AI quota windows across
+OpenCode Go, Ollama Cloud, and ClinePass.**
 
-![AI Quota Monitor 概览](docs/images/overview-light.png)
+Quota Nexus（AI 额度雷达）是一个 Windows 优先的本地额度面板，把多个 OpenCode Go、
+Ollama Cloud 和 ClinePass 账号聚合到同一套界面。当前版本聚焦额度采集、历史、告警和
+账号健康；架构保留继续扩展账号操作、客户端联动或请求路由的空间。
+
+![Quota Nexus 概览](docs/images/overview-light.png)
 
 ## 下载
 
-在 [GitHub Releases](https://github.com/Shallow-dusty/ai-quota-monitor/releases/latest) 下载
-`AI-Quota-Monitor_*_Windows_x64_Installer_UNSIGNED.exe`，并用同一 Release 中的
+在 [GitHub Releases](https://github.com/Shallow-dusty/Quota-Nexus/releases/latest) 下载
+`Quota-Nexus_*_Windows_x64_Installer_UNSIGNED.exe`，并用同一 Release 中的
 `checksums.txt` 核对 SHA-256。
 
 当前 Windows 安装器尚未进行发布者代码签名，因此文件名明确标注 `UNSIGNED`，首次运行可能
@@ -62,7 +65,7 @@ pnpm desktop:build
 `pnpm desktop:build` 生成 Windows NSIS 安装包和 SHA-256 校验文件。公开的未签名包必须在
 文件名和 Release 说明中标注 `UNSIGNED`；配置发布者证书后再发布新的签名版本。
 
-本地数据位于 `%APPDATA%\com.aiquotamonitor.desktop\`。卸载与彻底清理方法见
+本地数据位于 `%APPDATA%\com.quotanexus.desktop\`。卸载与彻底清理方法见
 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## 文档

@@ -1,12 +1,12 @@
 [package]
-name = "ai-quota-monitor"
+name = "quota-nexus"
 version = "0.1.0"
 description = "Local multi-provider quota monitor"
 edition.workspace = true
 license.workspace = true
 
 [lib]
-name = "ai_quota_monitor_lib"
+name = "quota_nexus_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

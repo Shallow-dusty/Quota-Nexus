@@ -1,4 +1,4 @@
-# AI Quota Monitor 设计与实现基线
+# Quota Nexus 设计与实现基线
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -10,7 +10,7 @@
 
 ## 1. 产品目标
 
-AI Quota Monitor 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放进同一个额度面板，
+Quota Nexus 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放进同一个额度面板，
 统一展示供应商原生窗口、已用比例、重置时间、数据新鲜度和认证健康。
 
 当前版本优先完成额度监控，不接管现有客户端，也不进入模型请求链路。这是当前开发阶段的

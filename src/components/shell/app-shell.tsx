@@ -52,10 +52,10 @@ export function AppShell({
           {!collapsed && (
             <div className="brand-copy leading-tight">
               <div className="text-[13.5px] font-semibold tracking-tight text-ink-1">
-                Quota Monitor
+                Quota Nexus
               </div>
               <div className="text-[10px] text-ink-3 mt-0.5">
-                AI 服务额度
+                AI 额度
               </div>
             </div>
           )}

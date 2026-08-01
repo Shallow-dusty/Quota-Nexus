@@ -256,7 +256,7 @@ pub async fn export_diagnostics(
         .map_err(|_| CommandError::storage("无法读取数据库 schema 版本"))?;
     let generated_at = Utc::now();
     let manifest = serde_json::json!({
-        "application": "AI Quota Monitor",
+        "application": "Quota Nexus",
         "version": env!("CARGO_PKG_VERSION"),
         "os": std::env::consts::OS,
         "arch": std::env::consts::ARCH,
@@ -332,7 +332,7 @@ fn write_diagnostic_archive(
 pub fn send_test_notification(app: tauri::AppHandle) -> Result<(), CommandError> {
     app.notification()
         .builder()
-        .title("AI Quota Monitor")
+        .title("Quota Nexus")
         .body("Windows 通知已连接；正式告警会按状态代次去重。")
         .show()
         .map_err(|_| CommandError::storage("无法发送 Windows 通知"))
@@ -1076,7 +1076,7 @@ mod tests {
             source: "tauri",
         };
         let manifest = serde_json::json!({
-            "application": "AI Quota Monitor",
+            "application": "Quota Nexus",
             "files": get_diagnostic_manifest(),
         });
         let health = vec![ProviderHealthView {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ThemePreference } from "./quota-types";
 
-const STORAGE_KEY = "aiqm.theme";
+const STORAGE_KEY = "qn.theme";
 
 function resolveTheme(pref: ThemePreference): "light" | "dark" {
   if (pref !== "system") return pref;

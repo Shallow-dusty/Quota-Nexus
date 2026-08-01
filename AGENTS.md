@@ -1,4 +1,4 @@
-# AGENTS.md — AI Quota Monitor
+# AGENTS.md — Quota Nexus
 
 本文件约束在本仓库工作的 Agent。
 
