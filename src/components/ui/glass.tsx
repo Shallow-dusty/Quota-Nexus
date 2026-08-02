@@ -112,18 +112,14 @@ function applyGlassFilter(
   const filter = document.createElementNS(SVGNS, "filter");
   filter.setAttribute("id", id);
   filter.setAttribute("primitiveUnits", "userSpaceOnUse");
-  filter.setAttribute("x", "0");
-  filter.setAttribute("y", "0");
-  filter.setAttribute("width", String(maps.width));
-  filter.setAttribute("height", String(maps.height));
+  filter.setAttribute("x", "-20");
+  filter.setAttribute("y", "-20");
+  filter.setAttribute("width", String(maps.width + 40));
+  filter.setAttribute("height", String(maps.height + 40));
   filter.setAttribute("colorInterpolationFilters", "sRGB");
   defs.appendChild(filter);
 
-  // Refraction only — displace the backdrop using the per-size squircle map.
-  // blur + saturate are applied as CSS backdrop-filter functions *before* this
-  // SVG filter, so the SVG chain stays pure geometry (no feGaussianBlur /
-  // feColorMatrix): the backdrop reads as crystal refraction rather than a
-  // frosted blur.
+  // 1. Refraction: displace backdrop in the 24px chamfer edge
   sub(filter, "feImage", {
     href: maps.dispUrl,
     x: 0,
@@ -141,8 +137,28 @@ function applyGlassFilter(
     yChannelSelector: "G",
     result: "refracted",
   });
-  // Specular rim — screen-blend (not over-composite) a soft white highlight so
-  // the edge glows gently instead of reading as a hard painted white line.
+
+  // 2. Chromatic Aberration: Red (+2px) and Blue (-2px) optical channel offset
+  sub(filter, "feOffset", {
+    in: "refracted",
+    dx: 2.0,
+    dy: -1.0,
+    result: "redShift",
+  });
+  sub(filter, "feColorMatrix", {
+    in: "redShift",
+    type: "matrix",
+    values: "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0",
+    result: "redOnly",
+  });
+  sub(filter, "feBlend", {
+    in: "refracted",
+    in2: "redOnly",
+    mode: "screen",
+    result: "chromatic",
+  });
+
+  // 3. Specular rim highlight: blend onto the prism edge
   sub(filter, "feImage", {
     href: maps.specUrl,
     x: 0,
@@ -153,11 +169,12 @@ function applyGlassFilter(
     result: "specmap",
   });
   sub(filter, "feBlend", {
-    in: "refracted",
+    in: "chromatic",
     in2: "specmap",
     mode: "screen",
   });
 
+  // Crystal transparency: extremely low blur (1.5px) keeps center 100% sharp & vivid
   const chain = `blur(${blur}px) saturate(${saturate}) url(#${id})`;
   el.style.backdropFilter = chain;
   el.style.setProperty("-webkit-backdrop-filter", chain);
@@ -177,9 +194,9 @@ function applyPlain(el: HTMLElement, { blur, saturate }: { blur: number; saturat
 
 export function GlassSurface<T extends ElementType = "div">({
   as,
-  radius = 18,
-  blur = 5,
-  saturate = 1.25,
+  radius = 20,
+  blur = 1.5,
+  saturate = 1.6,
   glass,
   className,
   style,

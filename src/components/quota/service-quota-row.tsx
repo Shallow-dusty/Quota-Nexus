@@ -4,7 +4,6 @@ import { formatPercent, formatRelativePast } from "../../lib/format";
 import { clampPercent, remainingPercent, toneForAccount } from "../../lib/quota-logic";
 import type { ServiceQuotaView, WindowTone } from "../../lib/quota-types";
 import { useNow } from "../../lib/use-now";
-import { GlassSurface } from "../ui/glass";
 import { PausedBadge, PlanBadge, StatusBadge } from "../ui/status-badge";
 import { ProviderMark } from "./provider-mark";
 
@@ -32,8 +31,8 @@ export function ServiceQuotaRow({
   const paused = account.state === "paused";
 
   return (
-    <GlassSurface radius={16}
-      className="quota-row px-5 py-4 flex items-center gap-5"
+    <div
+      className="glass-surface rounded-2xl quota-row px-5 py-4 flex items-center gap-5 cursor-pointer"
       role="button"
       tabIndex={0}
       aria-label={`查看账号详情：${account.accountLabel}`}
@@ -98,6 +97,6 @@ export function ServiceQuotaRow({
           </Button>
         </div>
       </div>
-    </GlassSurface>
+    </div>
   );
 }

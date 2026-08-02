@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.4 — 2026-08-02
+
+重构 3D 光学色散液态玻璃 (3D Optics & Chromatic Liquid Glass Engine)：
+
+- **中心晶莹剔透 (Clear Transmission)**：中心 `blur` 降至 `1.5px`（几乎零模糊），消除 2020 时代大面积模糊导致的“老毛玻璃感”；背景内容与颜色高保真透出。
+- **24px 3D 边缘折射 (3D Chamfer Lensing)**：边缘导角区 (`bev`) 扩至 `24px`，折射位移 (`maxDisp`) 升至 `18`；使用 Sigmoid 凸透镜曲面，实现边缘强力液态扭曲。
+- **彩虹边缘色散 (Chromatic Aberration Prism Split)**：SVG 滤镜引入 RGB 分通道色散算法（`feOffset` dx: 2.0 / dy: -1.0），在玻璃 24px 弯曲边缘呈现真三棱镜彩虹色散与光学分色。
+- **3D 菲涅尔多重立体阴影 (Multi-tier Fresnel Inset Shadows)**：淘汰平面 1px 单线边框，采用高阶 4 层 Inset 阴影组合（顶部 1px 镜面 Highlight + 3px Chamfer 凸起光 + 12px 深度折射体 + 底部 Dark Refraction），赋予玻璃真实的压克力/晶体厚度感。
+- **动态流体环境光 (Fluid Gradient Blobs)**：升级 `app-shell` 动态环境光斑，提供丰富的高对比色彩供玻璃边缘折射。
+
 ## v0.1.3 — 2026-08-02
 
 液态玻璃重做：从“磨砂糊+硬叠白边”改为“折射为主+柔和镜面”，更接近 Apple Liquid Glass 的晶莹剔透。

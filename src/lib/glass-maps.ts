@@ -82,19 +82,19 @@ function dataToUrl(data: Uint8ClampedArray, w: number, h: number): string {
 export function buildGlassMaps({
   width,
   height,
-  radius = 18,
+  radius = 20,
   bevel = null,
-  maxDisp = 8,
+  maxDisp = 18,
   refraction = 1,
   lightAngle = -65,
-  specStrength = 0.85,
-  edgeWidth = 1.4,
-  edgeAmbient = 0.22,
+  specStrength = 0.95,
+  edgeWidth = 2.4,
+  edgeAmbient = 0.30,
   resolution = 1,
 }: GlassMapsOptions): GlassMaps {
   const w = Math.max(2, Math.round(width * resolution));
   const h = Math.max(2, Math.round(height * resolution));
-  const bev = (bevel ?? Math.max(9, Math.min(radius, 15))) * resolution;
+  const bev = (bevel ?? Math.max(16, Math.min(radius * 1.2, 24))) * resolution;
 
   const disp = new Uint8ClampedArray(w * h * 4);
   const spec = new Uint8ClampedArray(w * h * 4);
@@ -110,7 +110,7 @@ export function buildGlassMaps({
   const lx = Math.cos(la);
   const ly = Math.sin(la);
 
-  const ew = Math.max(0.75, edgeWidth * resolution);
+  const ew = Math.max(1.2, edgeWidth * resolution);
   const eps = 1;
 
   for (let y = 0; y < h; y++) {
@@ -129,8 +129,9 @@ export function buildGlassMaps({
       const nx = gx / gl;
       const ny = gy / gl;
 
-      // refraction: peak at the edge, ease to zero across the bevel
-      const prof = smoothstep(1 - distIn / bev);
+      // 3D chamfer lens profile: quartic curve fading to 0 in center
+      const rawProf = clamp01(1 - distIn / bev);
+      const prof = Math.pow(Math.sin(rawProf * Math.PI * 0.5), 1.8);
       const amount = md * prof * refraction;
       const dx = -nx * amount;
       const dy = -ny * amount;
@@ -141,11 +142,11 @@ export function buildGlassMaps({
       disp[i + 2] = 128;
       disp[i + 3] = 255;
 
-      // specular: crisp edge line, directional + faint opposite bounce
-      const edgeT = clamp01(1 - distIn / ew);
+      // Fresnel specular rim highlight
+      const edgeT = Math.pow(clamp01(1 - distIn / ew), 1.4);
       const facing = Math.max(0, nx * lx + ny * ly);
       const back = Math.max(0, -(nx * lx + ny * ly));
-      const s = edgeT * (edgeAmbient + specStrength * facing) + edgeT * back * 0.18;
+      const s = edgeT * (edgeAmbient + specStrength * facing) + edgeT * back * 0.22;
       spec[i] = 255;
       spec[i + 1] = 255;
       spec[i + 2] = 255;
