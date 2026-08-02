@@ -1,6 +1,13 @@
 # Changelog
 
-## v0.1.4 — 2026-08-02
+## v0.1.5 — 2026-08-02
+
+浮层视效修补与材质明度再平衡 (Floating Layer Isolation & Contrast Balance)：
+
+- **抽屉与弹窗遮罩修补 (Drawer/Popover Isolation)**：将右侧详情抽屉面板 (`.drawer-panel`)、弹窗与下拉列表 (`.glass-popover`) 的背景透明度调至高遮罩率状态 (`0.88 - 0.92`)，解决原本全透导致抽屉文字与底层卡片严重字痕重叠的穿透碰撞问题。
+- **环境光与底色纯正化 (Unified Ambient Backlighting)**：重置深色模式下的底色渐变，去除侧栏下方生硬偏红的橙色光斑，统一为优雅深邃的靛紫-青蓝极光背景；浅色模式改用冷灰蓝 Canvas 调性。
+- **抽屉动作按钮精致化 (Refined Drawer Controls)**：抽屉顶部动作按键组淡化生硬白框，危险操作按钮（删除账号）配备柔和红微光。
+
 
 重构 3D 光学色散液态玻璃 (3D Optics & Chromatic Liquid Glass Engine)：
 
