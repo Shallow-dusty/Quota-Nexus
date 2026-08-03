@@ -1,6 +1,13 @@
 # Changelog
 
-## v0.1.5 — 2026-08-02
+## v0.1.6 — 2026-08-02
+
+终极 3D 晶莹液态玻璃材质系统 (Ultimate 3D Liquid Crystal Engine):
+
+- **3D 果冻胶囊进度条 (3D Jelly Pill Progress)**：加粗至 14px 润泽胶囊，轨道采用 3D 玻璃凹槽内阴影，填块右端加入润泽液滴高光头 (Capsule End Bulb Sheen)，带来极致 Q 弹的水晶宝石质感。
+- **28px 晶体压克力卡片 Chamfer**：卡片圆角提升至 28px，结合顶部 2.5px 纯白凸透镜 3D 导角高光，浅色底升至 0.78 润泽银白。
+- **3D 晶透图标块 (3D Crystal Squircle Icon)**：Provider 标记升级为 42px 晶透圆角方块，配以高光折射与浮雕投影。
+
 
 浮层视效修补与材质明度再平衡 (Floating Layer Isolation & Contrast Balance)：
 

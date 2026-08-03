@@ -11,8 +11,8 @@
 :root {
   color-scheme: light;
 
-  --canvas: #e8edf0;
-  --canvas-deep: #ccd6d9;
+  --canvas: #f3f5f8;
+  --canvas-deep: #e5e9ee;
   --stage: rgba(244, 247, 245, 0.34);
   --stage-solid: #f4f6f5;
 
@@ -75,17 +75,16 @@
     0 4px 20px rgba(28, 34, 30, 0.10),
     0 30px 90px rgba(32, 39, 34, 0.25);
 
-  --glass-bg: rgba(255, 255, 255, 0.45);
-  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.12) 30%, rgba(255, 255, 255, 0) 60%);
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 35%, rgba(255, 255, 255, 0) 70%);
   --glass-edge:
-    inset 1px 1px 1px rgba(255, 255, 255, 0.80),
-    inset 3px 3px 10px rgba(255, 255, 255, 0.35),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.12),
-    inset -4px -4px 14px rgba(0, 0, 0, 0.05);
-  --glass-outline: rgba(255, 255, 255, 0.40);
+    inset 0 2.5px 2px 0 rgba(255, 255, 255, 0.98),
+    inset 2.5px 0 2px 0 rgba(255, 255, 255, 0.85),
+    inset -1.5px -1.5px 3px 0 rgba(0, 0, 0, 0.05);
+  --glass-outline: rgba(255, 255, 255, 0.95);
   --glass-shadow:
-    0 12px 36px -6px rgba(24, 32, 48, 0.16),
-    0 2px 6px rgba(0, 0, 0, 0.04);
+    0 24px 64px -12px rgba(28, 42, 75, 0.12),
+    0 8px 24px -4px rgba(0, 0, 0, 0.05);
   --glass-solid: #f7f8f6;
 
   --r-sm: 8px;
@@ -164,17 +163,16 @@
     0 4px 20px rgba(0, 0, 0, 0.4),
     0 34px 100px rgba(0, 0, 0, 0.65);
 
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0) 60%);
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 35%, rgba(255, 255, 255, 0) 70%);
   --glass-edge:
-    inset 1px 1px 1px rgba(255, 255, 255, 0.45),
-    inset 3px 3px 12px rgba(255, 255, 255, 0.15),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.50),
-    inset -6px -6px 20px rgba(0, 0, 0, 0.30);
-  --glass-outline: rgba(255, 255, 255, 0.15);
+    inset 0 2px 2px 0 rgba(255, 255, 255, 0.45),
+    inset 2px 0 2px 0 rgba(255, 255, 255, 0.30),
+    inset -1.5px -1.5px 3px 0 rgba(0, 0, 0, 0.45);
+  --glass-outline: rgba(255, 255, 255, 0.18);
   --glass-shadow:
-    0 16px 48px -8px rgba(0, 0, 0, 0.6),
-    0 2px 8px rgba(0, 0, 0, 0.4);
+    0 24px 60px -10px rgba(0, 0, 0, 0.65),
+    0 6px 18px -4px rgba(0, 0, 0, 0.45);
   --glass-solid: #202421;
 }
 
@@ -809,21 +807,25 @@ body {
 .provider-mark {
   position: relative;
   flex: none;
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 11px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), color-mix(in srgb, currentColor 7%, transparent));
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(235, 244, 255, 0.85) 60%, rgba(215, 232, 255, 0.60) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 3px 9px color-mix(in srgb, currentColor 11%, transparent);
+    inset 0 2.5px 2px rgba(255, 255, 255, 1),
+    inset 0 -2.5px 4px rgba(37, 99, 235, 0.18),
+    0 6px 18px rgba(37, 99, 235, 0.18);
+  backdrop-filter: blur(14px);
 }
 
 :root[data-theme="dark"] .provider-mark {
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.13), color-mix(in srgb, currentColor 9%, transparent));
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(50, 65, 85, 0.45) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 3px 10px rgba(0, 0, 0, 0.2);
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.4),
+    0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .badge {
@@ -1017,50 +1019,56 @@ body {
   margin-top: auto;
 }
 
+/* 3D 液态晶莹果冻胶囊进度条 (Jelly Pill Liquid Crystal Progress Bar) */
 .quota-track {
-  --quota-color: var(--fill-normal);
-  --quota-color-deep: color-mix(in srgb, var(--fill-normal) 82%, #183d83);
-  --quota-glow: color-mix(in srgb, var(--fill-normal) 28%, transparent);
+  --quota-top: #60a5fa;
+  --quota-mid: #2563eb;
+  --quota-bot: #1d4ed8;
+  --quota-glow: rgba(37, 99, 235, 0.45);
   position: relative;
-  height: 8px;
-  padding: 1px;
+  height: 14px;
+  padding: 1.5px;
   overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
-  border-radius: 999px;
+  border-radius: 9999px;
   background:
-    linear-gradient(180deg, rgba(32, 40, 35, 0.11), rgba(255, 255, 255, 0.22)),
-    var(--track);
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(255, 255, 255, 0.45) 100%),
+    rgba(220, 226, 235, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow:
-    inset 0 1px 2px rgba(26, 35, 29, 0.16),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.58),
-    0 1px 0 rgba(255, 255, 255, 0.35);
+    inset 0 2px 3px rgba(0, 0, 0, 0.12),
+    inset 0 -1.5px 1px rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(255, 255, 255, 0.8);
   transition:
     border-color var(--dur-med) var(--ease),
     box-shadow var(--dur-med) var(--ease);
 }
 
 .quota-track[data-tone="warning"] {
-  --quota-color: var(--fill-warn);
-  --quota-color-deep: color-mix(in srgb, var(--fill-warn) 84%, #725011);
-  --quota-glow: color-mix(in srgb, var(--fill-warn) 30%, transparent);
+  --quota-top: #ffb038;
+  --quota-mid: #ea580c;
+  --quota-bot: #c2410c;
+  --quota-glow: rgba(234, 88, 12, 0.5);
 }
 
 .quota-track[data-tone="high"] {
-  --quota-color: var(--fill-high);
-  --quota-color-deep: color-mix(in srgb, var(--fill-high) 84%, #7c331a);
-  --quota-glow: color-mix(in srgb, var(--fill-high) 30%, transparent);
+  --quota-top: #ff7640;
+  --quota-mid: #dc2626;
+  --quota-bot: #991b1b;
+  --quota-glow: rgba(220, 38, 38, 0.5);
 }
 
 .quota-track[data-tone="critical"] {
-  --quota-color: var(--fill-crit);
-  --quota-color-deep: color-mix(in srgb, var(--fill-crit) 84%, #7a202a);
-  --quota-glow: color-mix(in srgb, var(--fill-crit) 34%, transparent);
+  --quota-top: #ff5277;
+  --quota-mid: #e11d48;
+  --quota-bot: #9f1239;
+  --quota-glow: rgba(225, 29, 72, 0.55);
 }
 
 .quota-track[data-tone="stale"] {
-  --quota-color: var(--fill-stale);
-  --quota-color-deep: color-mix(in srgb, var(--fill-stale) 84%, #4c5550);
-  --quota-glow: color-mix(in srgb, var(--fill-stale) 22%, transparent);
+  --quota-top: #94a3b8;
+  --quota-mid: #64748b;
+  --quota-bot: #334155;
+  --quota-glow: rgba(100, 116, 139, 0.35);
 }
 
 .quota-fill {
@@ -1069,39 +1077,52 @@ body {
   height: 100%;
   min-width: 0;
   overflow: visible;
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, var(--quota-color-deep), var(--quota-color) 72%, color-mix(in srgb, var(--quota-color) 84%, white));
+  border-radius: 9999px;
+  background: linear-gradient(180deg, var(--quota-top) 0%, var(--quota-mid) 50%, var(--quota-bot) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.58),
-    inset 0 -1px 1px rgba(20, 29, 24, 0.2),
-    0 1px 5px var(--quota-glow);
-  transition:
-    width var(--dur-med) var(--ease),
-    filter var(--dur-fast) var(--ease);
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.35),
+    0 3px 12px var(--quota-glow);
+  transition: width var(--dur-med) var(--ease);
 }
 
-.quota-fill-caustic {
+.quota-fill-sheen {
   position: absolute;
-  inset: 0 2px 45% 2px;
-  border-radius: inherit;
-  overflow: hidden;
-  background:
-    linear-gradient(96deg, transparent 5%, rgba(255, 255, 255, 0.42) 32%, transparent 58%, rgba(255, 255, 255, 0.22) 78%, transparent 96%);
-  opacity: 0.78;
+  inset: 1px 3px 50% 3px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.15) 75%, transparent 100%);
 }
 
-.quota-track[data-state="empty"] .quota-fill-caustic {
+.quota-fill-bulb {
+  position: absolute;
+  right: -1px;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95) 0%, transparent 70%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+}
+
+.quota-track[data-state="empty"] .quota-fill {
   display: none;
 }
 
+::root[data-theme="dark"] .quota-track {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(255, 255, 255, 0.08) 100%),
+    rgba(20, 24, 22, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 .quota-thresholds {
-  position: absolute;
-  z-index: 2;
-  inset: 1px;
-  overflow: hidden;
-  border-radius: inherit;
-  pointer-events: none;
+  display: none;
 }
 
 .quota-thresholds i {

@@ -28,8 +28,8 @@ export function ServiceQuotaCard({
 
   return (
     <GlassSurface
-      radius={18}
-      className="quota-card p-4 flex flex-col gap-3"
+      radius={28}
+      className="quota-card p-5.5 flex flex-col gap-4"
       role="button"
       tabIndex={0}
       aria-label={`查看账号详情：${account.accountLabel}`}
@@ -41,23 +41,23 @@ export function ServiceQuotaCard({
         }
       }}
     >
-      <div className="quota-card-header flex items-start gap-3">
-        <ProviderMark provider={account.provider} size={32} />
+      <div className="quota-card-header flex items-center gap-3.5">
+        <ProviderMark provider={account.provider} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="privacy-sensitive text-[14px] font-semibold text-ink-1 truncate">
+            <h3 className="privacy-sensitive text-[16.5px] font-bold text-ink-1 tracking-tight truncate">
               {account.accountLabel}
             </h3>
             {account.plan && <PlanBadge plan={account.plan} />}
           </div>
-          <p className="text-[11.5px] text-ink-3 truncate mt-0.5">
+          <p className="text-[13px] text-ink-3 truncate mt-0.5 font-medium">
             {account.providerName}
           </p>
         </div>
         {paused ? <PausedBadge /> : <StatusBadge tone={tone} />}
       </div>
 
-      <div className="quota-windows flex flex-col gap-3.5 mt-1">
+      <div className="quota-windows flex flex-col gap-4 mt-1">
         {account.windows.map((w) => (
           <QuotaWindowRow key={w.id} window={w} now={now} />
         ))}
@@ -65,30 +65,30 @@ export function ServiceQuotaCard({
 
       {stale && account.errorCategory && (
         <div
-          className="flex items-start gap-2 px-2.5 py-2 rounded-[var(--r-sm)] text-[11.5px]"
+          className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-[12px]"
           style={{
             background: "var(--stale-soft)",
             color: "var(--stale)",
           }}
         >
-          <span className="font-medium">{ERROR_LABEL[account.errorCategory]}</span>
+          <span className="font-semibold">{ERROR_LABEL[account.errorCategory]}</span>
           <span className="text-ink-3"> · {ERROR_HINT[account.errorCategory]}</span>
         </div>
       )}
 
-      <div className="quota-card-footer flex items-center justify-between pt-2 border-t border-[var(--line)]">
-        <span className="text-[11px] text-ink-3">
+      <div className="quota-card-footer flex items-center justify-between pt-3 border-t border-[var(--line)]">
+        <span className="text-[12px] font-medium text-ink-3">
           上次成功 {formatDateTime(account.lastSuccessAt)}
         </span>
         <div onClick={(event) => event.stopPropagation()}>
           <Button
             onPress={() => onRefresh?.(account.id)}
             isDisabled={refreshing || paused || account.errorCategory === "auth"}
-            className="btn btn-icon"
+            className="btn btn-icon h-9 w-9 rounded-xl shadow-sm"
             aria-label="刷新此账号"
             data-tooltip="刷新此账号"
           >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
           </Button>
         </div>
       </div>
