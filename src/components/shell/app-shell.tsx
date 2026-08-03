@@ -11,6 +11,17 @@ import type { PageId } from "../../lib/quota-types";
 import { AppMark } from "./app-mark";
 import { GlassSurface } from "../ui/glass";
 
+const handleWindowAction = (action: "close" | "minimize" | "maximize") => {
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      if (action === "close") win.close();
+      else if (action === "minimize") win.minimize();
+      else if (action === "maximize") win.toggleMaximize();
+    }).catch(() => {});
+  }
+};
+
 const NAV: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> =
   [
     { id: "overview", label: "概览", icon: LayoutDashboard },
@@ -43,12 +54,30 @@ export function AppShell({
           collapsed ? "w-16" : "w-56"
         }`}
       >
-        <div className="sidebar-top flex flex-col pt-3 px-4 gap-2">
+        <div className="sidebar-top flex flex-col pt-3 px-4 gap-2" data-tauri-drag-region>
           {/* macOS window control decoration matching design reference */}
-          <div className="window-dots flex items-center gap-1.5 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shadow-[0_0_4px_rgba(239,68,68,0.4)]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#eab308] shadow-[0_0_4px_rgba(234,179,8,0.4)]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e] shadow-[0_0_4px_rgba(34,197,94,0.4)]" />
+          <div className="window-dots flex items-center gap-2 mb-1">
+            <button
+              type="button"
+              onClick={() => handleWindowAction("close")}
+              className="w-3 h-3 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
+              aria-label="关闭窗口"
+              title="关闭窗口"
+            />
+            <button
+              type="button"
+              onClick={() => handleWindowAction("minimize")}
+              className="w-3 h-3 rounded-full bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
+              aria-label="最小化窗口"
+              title="最小化窗口"
+            />
+            <button
+              type="button"
+              onClick={() => handleWindowAction("maximize")}
+              className="w-3 h-3 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
+              aria-label="最大化/还原窗口"
+              title="最大化/还原窗口"
+            />
           </div>
 
           <div

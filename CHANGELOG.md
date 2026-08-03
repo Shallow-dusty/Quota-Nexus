@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.1.7 — 2026-08-02
+## v0.1.8 — 2026-08-02
+
+无边框晶透桌面沉浸框体 (Custom Frameless Translucent Window):
+
+- **移除 Windows 原生黑标题栏与硬质黑框 (Remove Windows Titlebar)**：在 `tauri.conf.json` 中配置 `"decorations": false` 和 `"transparent": true`，彻底丢弃原生黑框，使整个 Webview 窗口直接嵌入系统透明画层。
+- **自定义 3D 水晶拖拽与窗口控制**：左上角红黄绿 3D 晶透红绿灯直接关联 Windows 系统最小化/最大化/关闭窗口，侧栏顶部与全局顶栏加入 `data-tauri-drag-region` 拖拽支持。
+
 
 极润晶透 3D 液态玻璃材质引擎 (Hyper-Liquid Ice Glass System):
 
