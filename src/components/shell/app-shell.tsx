@@ -43,22 +43,31 @@ export function AppShell({
           collapsed ? "w-16" : "w-56"
         }`}
       >
-        <div
-          className={`app-brand flex items-center gap-2.5 h-16 shrink-0 ${
-            collapsed ? "justify-center px-0" : "px-4"
-          }`}
-        >
-          <AppMark size={32} />
-          {!collapsed && (
-            <div className="brand-copy leading-tight">
-              <div className="text-[13.5px] font-semibold tracking-tight text-ink-1">
-                Quota Nexus
+        <div className="sidebar-top flex flex-col pt-3 px-4 gap-2">
+          {/* macOS window control decoration matching design reference */}
+          <div className="window-dots flex items-center gap-1.5 mb-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shadow-[0_0_4px_rgba(239,68,68,0.4)]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#eab308] shadow-[0_0_4px_rgba(234,179,8,0.4)]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e] shadow-[0_0_4px_rgba(34,197,94,0.4)]" />
+          </div>
+
+          <div
+            className={`app-brand flex items-center gap-2.5 h-12 shrink-0 ${
+              collapsed ? "justify-center !px-0" : "!px-0"
+            }`}
+          >
+            <AppMark size={32} />
+            {!collapsed && (
+              <div className="brand-copy leading-tight">
+                <div className="text-[13.5px] font-semibold tracking-tight text-ink-1">
+                  Quota Nexus
+                </div>
+                <div className="text-[10px] text-ink-3 mt-0.5">
+                  AI 额度
+                </div>
               </div>
-              <div className="text-[10px] text-ink-3 mt-0.5">
-                AI 额度
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <ul className="app-nav flex flex-col gap-1.5 px-2.5 py-3 flex-1">

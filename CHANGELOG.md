@@ -1,6 +1,14 @@
 # Changelog
 
-## v0.1.6 — 2026-08-02
+## v0.1.7 — 2026-08-02
+
+极润晶透 3D 液态玻璃材质引擎 (Hyper-Liquid Ice Glass System):
+
+- **冰晶极光氛围背景 (Ambient Ice Aurora Wallpaper)**：引入通透的天蓝-冰蓝-淡紫流体壁纸背景，彻底替代沉闷灰色底色。
+- **高透 3D 水晶模压背板 (Translucent Crystal Backplate)**：提高卡片与侧栏透明度，透出背景极光；四周加固 3.5px 3D 水晶凸起反光管，右上/左下内嵌三棱镜彩虹折射光斑。
+- **3D 晶透胶囊控件 (3D Crystal Pill Controls)**：`全部刷新`、`导出快照`、`网格/列表` 及选项卡控件全量 3D 晶透胶囊化。
+- **macOS 风格 3D 水晶窗口控制粒 (macOS 3D Crystal Window Controls)**：侧栏顶部嵌入经典红黄绿 3D 晶透按键装饰。
+
 
 终极 3D 晶莹液态玻璃材质系统 (Ultimate 3D Liquid Crystal Engine):
 
