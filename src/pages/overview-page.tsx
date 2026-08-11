@@ -1,9 +1,9 @@
 import { Download, FilterX, Inbox, Plus, RefreshCw } from "lucide-react";
-import { Button } from "react-aria-components";
+import { Button } from "../components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { useToast } from "../components/ui/toast";
-import { sortAccounts, type AccountSortMode } from "../lib/quota-logic";
+import { sortAccounts, isConnectionAbnormal, type AccountSortMode } from "../lib/quota-logic";
 import { useLocalPref } from "../lib/use-local-pref";
 import type { PageId, ServiceQuotaView } from "../lib/quota-types";
 import { PageHeader } from "../components/shell/app-shell";
@@ -16,7 +16,20 @@ import { ServiceQuotaRow } from "../components/quota/service-quota-row";
 import { GlassSurface } from "../components/ui/glass";
 import { formatTime } from "../lib/format";
 
-type Filter = "all" | "attention";
+type Filter = "all" | "abnormal";
+
+/** 异常筛选只是临时视图：会话内恢复（sessionStorage），重启后回默认，避免陈旧过滤暗藏 */
+function useSessionFilter(): [Filter, (next: Filter) => void] {
+  const [filter, setFilter] = useState<Filter>(() =>
+    window.sessionStorage.getItem("qn.overview-filter") === "abnormal"
+      ? "abnormal"
+      : "all",
+  );
+  useEffect(() => {
+    window.sessionStorage.setItem("qn.overview-filter", filter);
+  }, [filter]);
+  return [filter, setFilter];
+}
 
 export function OverviewPage({
   onPageChange,
@@ -28,11 +41,12 @@ export function OverviewPage({
   const [source, setSource] = useState<"phase0-fixture" | "tauri">("phase0-fixture");
   const [refreshing, setRefreshing] = useState(false);
   const [cardRefreshing, setCardRefreshing] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useSessionFilter();
+  // 新 key：旧版本持久化的 risk 默认值不再生效，默认回退为稳定排序（名称）
   const [sort, setSort] = useLocalPref<AccountSortMode>(
-    "qn.overview-sort",
-    ["risk", "name", "provider"] as const,
-    "risk",
+    "qn.overview-sort-v2",
+    ["name", "provider", "risk"] as const,
+    "name",
   );
   const [view, setView] = useLocalPref<"grid" | "list">(
     "qn.overview-view",
@@ -84,25 +98,13 @@ export function OverviewPage({
 
   const visible = useMemo(() => {
     if (!accounts) return [];
-    const filtered = accounts.filter((a) => {
-      if (filter === "attention") {
-        return (
-          a.state === "stale-with-error" ||
-          a.windows.some((window) => window.tone !== "normal")
-        );
-      }
-      return true;
-    });
+    const filtered =
+      filter === "abnormal" ? accounts.filter(isConnectionAbnormal) : accounts;
     return sortAccounts(filtered, sort);
   }, [accounts, filter, sort]);
 
-  const needsAttentionCount = useMemo(
-    () =>
-      (accounts ?? []).filter(
-        (a) =>
-          a.state === "stale-with-error" ||
-          a.windows.some((w) => w.tone !== "normal"),
-      ).length,
+  const abnormalCount = useMemo(
+    () => (accounts ?? []).filter(isConnectionAbnormal).length,
     [accounts],
   );
 
@@ -195,11 +197,9 @@ export function OverviewPage({
               options={[
                 { id: "all", label: "全部" },
                 {
-                  id: "attention",
+                  id: "abnormal",
                   label:
-                    needsAttentionCount > 0
-                      ? `需处理 ${needsAttentionCount}`
-                      : "需处理",
+                    abnormalCount > 0 ? `连接异常 ${abnormalCount}` : "连接异常",
                 },
               ]}
             />
@@ -212,9 +212,9 @@ export function OverviewPage({
                 value={sort}
                 onChange={setSort}
                 options={[
-                  { id: "risk", label: "风险优先" },
                   { id: "name", label: "名称" },
                   { id: "provider", label: "供应商" },
+                  { id: "risk", label: "风险优先" },
                 ]}
               />
               <SegmentedControl
@@ -290,7 +290,7 @@ function FilterEmpty({ onClear }: { onClear: () => void }) {
       <div>
         <p className="text-ink-1 font-medium">当前筛选下没有账号</p>
         <p className="text-[12.5px] text-ink-3 mt-1">
-          没有符合当前筛选条件的账号
+          没有连接异常的账号
         </p>
       </div>
       <Button className="btn btn-outline" onPress={onClear}>

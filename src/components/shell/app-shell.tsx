@@ -9,20 +9,20 @@ import {
   X,
 } from "lucide-react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { Button } from "react-aria-components";
+import { Button } from "../ui/button";
 import type { PageId } from "../../lib/quota-types";
 import { AppMark } from "./app-mark";
 import { GlassSurface } from "../ui/glass";
 
 const handleWindowAction = (action: "close" | "minimize" | "maximize") => {
-  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-      const win = getCurrentWindow();
-      if (action === "close") win.close();
-      else if (action === "minimize") win.minimize();
-      else if (action === "maximize") win.toggleMaximize();
-    }).catch(() => {});
-  }
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+  void (async () => {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    if (action === "close") await win.close();
+    else if (action === "minimize") await win.minimize();
+    else await win.toggleMaximize();
+  })().catch((err) => console.warn("window action failed:", action, err));
 };
 
 const NAV: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> =

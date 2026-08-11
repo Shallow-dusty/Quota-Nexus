@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampPercent,
+  isConnectionAbnormal,
   remainingPercent,
   sortAccounts,
   sortByRisk,
@@ -68,6 +69,16 @@ describe("账号健康与排序（档位由 Core 下发）", () => {
       account({ id: "crit", windows: [win(99, "critical")] }),
     ];
     expect(sortByRisk(accounts).map((a) => a.id)).toEqual(["crit", "warn"]);
+  });
+
+  it("连接异常排在阈值告警之前（可操作 > 仅需知晓）", () => {
+    const accounts = [
+      account({ id: "crit", windows: [win(99, "critical")] }),
+      account({ id: "err", state: "stale-with-error", windows: [win(12, "normal")] }),
+      account({ id: "paused", state: "paused", windows: [win(0, "normal")] }),
+    ];
+    expect(sortByRisk(accounts).map((a) => a.id)).toEqual(["err", "paused", "crit"]);
+    expect(accounts.filter(isConnectionAbnormal).map((a) => a.id)).toEqual(["err", "paused"]);
   });
 });
 

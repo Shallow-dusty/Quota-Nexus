@@ -3,7 +3,7 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 文档状态 | Implemented baseline |
-| 版本 | 0.1.10 |
+| 版本 | 0.1.11 |
 | 最后更新 | 2026-08-11 |
 | 首要平台 | Windows 11 |
 | 产品形态 | 本地桌面应用 |
@@ -52,7 +52,7 @@ Quota Nexus 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放进�
 - Tauri 2 + Windows WebView2 + NSIS。
 - Rust、reqwest、sqlx/SQLite、keyring、Tauri plugins。
 - React 19、TypeScript、Vite、Tailwind CSS 4、React Aria、Lucide。
-- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 当前约 139KB gzip（超出 120KB 目标，待瘦身）。
+- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 约 90KB gzip（v0.1.11，达成 120KB 目标）。
 - Windows Credential Manager 保存 Provider 秘密和代理认证。
 
 前端没有第二个调度器。页面只读取 Rust Core DTO，并监听 `overview-updated` 事件；领域
@@ -181,8 +181,9 @@ ZIP 内容生成与解包扫描有独立 Rust 测试；导出中不包含 Cookie
 
 三个一级页面加一个详情层：
 
-- Overview：摘要、筛选、排序（风险/名称/供应商）、网格与列表两种视图、账号卡、
-  手动刷新、脱敏导出。卡片或行点击进入详情层；排序与视图偏好本地持久化。
+- Overview：摘要、连接异常筛选（仅含可操作异常；会话内恢复、重启复位，不做长期暗过滤）、
+  排序（默认名称稳定序；供应商/风险优先可选，风险优先中连接异常排在阈值告警之前）、网格与
+  列表两种视图、账号卡、手动刷新、脱敏导出。卡片或行点击进入详情层；排序与视图偏好本地持久化。
 - 账号详情抽屉：右侧滑入的详情层，从概览卡片或账号行进入，聚合该账号的额度窗口、
   连接状态、单账号历史趋势和全部账号操作（刷新/暂停/编辑/凭据/删除）。
 - Accounts：添加、凭据复用/更新、标签编辑、暂停/恢复、调度诊断、本地删除；行点击进入详情层。
@@ -215,6 +216,9 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 关闭透明时所有表面回退到实色；`prefers-reduced-motion` 取消位移/旋转；forced-colors 使用
 系统 Canvas/CanvasText/Highlight。截图隐私模式模糊账号标签和外部 ID。当前接受版本以 CSS
 和 SVG 材质实现，不把原生 Mica 作为 MVP 依赖，避免远程桌面和透明关闭时出现两套外观。
+无边框窗口教训（v0.1.11 修复）：Tauri 的 window 插件命令（minimize/close/toggleMaximize/
+start_dragging 等）不在 `core:default` 内，必须在 capabilities 显式授予 `window:allow-*`，
+否则窗口控制与拖拽被 ACL 静默拒绝；前端对这类调用不得静默 catch。
 材质引擎（v0.1.10 起）：折射位移剖面取凸 squircle 帽高度函数的导数（物理透镜近似）；
 色散为 R/B 通道 ±9% 的分通道位移，只在边缘位移区出现；高光为锐利 rim + 入射光带双层，
 随法线朝向变化；CSS 层以顶部光带、底部内阴影和环境投影表达玻璃厚度；数据卡中心 blur 7px
@@ -271,16 +275,17 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 - [x] 认证失效、陈旧、固定出口、解析、暂停、空状态均有文字/图标表现。
 - [x] 图表有等效数据表。
 - [x] 50 张额度卡全量渲染与滚动检查；当前无头回归环境首屏低于 2 秒。
-- [ ] 生产 JS gzip 低于 120KB：v0.1.10 实测约 139KB（主包 135.7KB + 异步块 3KB），超限待瘦身。
+- [x] 生产 JS gzip 低于 120KB：v0.1.11 实测约 90KB（主包 86.7KB + 异步块 3.1KB），
+  关键动作是移除 react-aria-components（全家桶约占原包 37%），换为轻量自实现原语。
 
 ### 10.4 当前证据
 
 | 检查 | 结果 |
 | --- | --- |
-| `pnpm test` | 7/7（2026-08-11 复验；删除两个死代码用例后为 7） |
+| `pnpm test` | 8/8（2026-08-11 复验；新增风险排序语义用例） |
 | `cargo test --lib` | 33 通过、5 忽略（2026-08-11 复验）；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
 | `cargo clippy --all-targets -- -D warnings` | 通过 |
-| `pnpm build` | 通过，JS 约 139KB gzip（2026-08-11 实测，超出 120KB 目标） |
+| `pnpm build` | 通过，JS 约 90KB gzip（2026-08-11 实测，达成 120KB 目标） |
 | `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过（2026-08-11 复验） |
 | 真实本机数据 | 已安装实例（v0.1.10）完成 schema 6 迁移，5 账号在库并真实刷新；OpenCode 百分比误读修复经生产数据验证（Yunara 周额度 100%→2%）（2026-08-11 复核） |
 
@@ -292,6 +297,6 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 - 账号操作、客户端联动和更细的通知规则。
 - 模型请求代理/路由或使用分析；若处理请求内容，需单独设计权限、保留与清理策略。
 - Linux/macOS 适配、公开签名发布和自动更新服务。
-- 前端 bundle 瘦身：v0.1.8 生产 JS gzip 约 138KB，需回到 120KB 目标内（见 §10.3）。
+- 前端 bundle 瘦身已完成（v0.1.11，约 90KB gzip）：移除 react-aria-components。
 
 新增能力不能把估算值冒充供应商真实额度，也不能绕过当前 Provider 请求作用域。

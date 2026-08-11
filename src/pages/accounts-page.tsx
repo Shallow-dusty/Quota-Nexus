@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { Button } from "react-aria-components";
+import { Button } from "../components/ui/button";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";
 import { formatDateTime, formatRelativePast } from "../lib/format";

@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Check, Globe } from "lucide-react";
-import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { Button } from "../ui/button";
+import { Dialog, Modal, ModalOverlay } from "../ui/modal";
 import { useEffect, useState } from "react";
 import {
   commandErrorMessage,
@@ -130,8 +131,7 @@ export function AddAccountDialog({
     >
       <Modal>
         <Dialog className="outline-none" aria-label="添加账号">
-          {({ close: closeDialog }) => (
-            <GlassSurface radius={20} blur={8}
+          <GlassSurface radius={20} blur={8}
               className="account-dialog w-[500px] max-w-full p-0 overflow-hidden"
             >
               {/* 步骤头 */}
@@ -378,7 +378,7 @@ export function AddAccountDialog({
               <div className="px-5 py-3 border-t border-[var(--line)] flex items-center justify-between">
                 <Button
                   className="btn btn-outline"
-                  onPress={() => (step === 0 ? closeDialog() : setStep(step - 1))}
+                  onPress={() => (step === 0 ? close() : setStep(step - 1))}
                 >
                   <ArrowLeft size={14} />
                   {step === 0 ? "取消" : "上一步"}
@@ -439,7 +439,6 @@ export function AddAccountDialog({
                 </Button>
               </div>
             </GlassSurface>
-          )}
         </Dialog>
       </Modal>
     </ModalOverlay>

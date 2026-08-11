@@ -1,5 +1,5 @@
 import { RefreshCw } from "lucide-react";
-import { Button } from "react-aria-components";
+import { Button } from "../ui/button";
 import { formatDateTime } from "../../lib/format";
 import { ERROR_HINT, ERROR_LABEL } from "../../lib/quota-copy";
 import { toneForAccount } from "../../lib/quota-logic";

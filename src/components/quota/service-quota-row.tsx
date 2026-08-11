@@ -1,5 +1,5 @@
 import { RefreshCw } from "lucide-react";
-import { Button } from "react-aria-components";
+import { Button } from "../ui/button";
 import { formatPercent, formatRelativePast } from "../../lib/format";
 import { clampPercent, remainingPercent, toneForAccount } from "../../lib/quota-logic";
 import type { ServiceQuotaView, WindowTone } from "../../lib/quota-types";

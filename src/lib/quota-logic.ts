@@ -27,11 +27,25 @@ export function toneForAccount(account: ServiceQuotaView): HealthTone {
   }, "normal");
 }
 
-/** 卡片排序：最危险状态优先（DESIGN §8），同档按最高使用率降序 */
+/**
+ * 连接异常 = 需要用户操作的数据状态（刷新连续失败 / 出口不可用暂停）。
+ * 额度阈值告警不算异常——那是提醒，不是故障。
+ */
+export function isConnectionAbnormal(account: ServiceQuotaView): boolean {
+  return account.state === "stale-with-error" || account.state === "paused";
+}
+
+/**
+ * 卡片排序：可操作异常优先于阈值告警（连接异常 > critical/high/warning > 正常），
+ * 同档按最高使用率降序。陈旧不再是高于正常的独立档位。
+ */
 export function sortByRisk(accounts: ServiceQuotaView[]): ServiceQuotaView[] {
   const maxUsed = (a: ServiceQuotaView) =>
     Math.max(...a.windows.map((w) => w.usedPercent), 0);
   return [...accounts].sort((a, b) => {
+    const stateDiff =
+      Number(isConnectionAbnormal(b)) - Number(isConnectionAbnormal(a));
+    if (stateDiff !== 0) return stateDiff;
     const rankDiff = TONE_RANK[toneForAccount(b)] - TONE_RANK[toneForAccount(a)];
     if (rankDiff !== 0) return rankDiff;
     return maxUsed(b) - maxUsed(a);

@@ -9,7 +9,7 @@ import {
   Trash2,
   Timer,
 } from "lucide-react";
-import { Button } from "react-aria-components";
+import { Button } from "../components/ui/button";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../lib/quota-client";

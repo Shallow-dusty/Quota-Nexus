@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.11 — 2026-08-11
+
+修复窗口控制失效（ACL 拒权）；概览筛选/排序重设计；前端包大幅瘦身。
+
+- 修复无边框窗口的严重回归：capabilities 只授 `core:default`，window 插件的
+  minimize/close/toggleMaximize/start_dragging 等命令自无边框化（v0.1.5）起一直被 ACL
+  拒绝，前端静默 catch 掩盖——窗口三键与拖拽区域形同虚设。现显式授予 `window:allow-*`
+  权限，窗口操作失败改为 console.warn 而非静默吞没。
+- 概览筛选重设计：「需处理」改为「连接异常」，只含可操作异常（刷新连续失败/出口暂停）；
+  额度阈值告警不再混入。筛选状态仅会话内恢复（sessionStorage），重启复位。
+- 排序默认改为名称稳定序（位置固定可肌肉记忆）；「风险优先」保留但语义修正：
+  连接异常排在阈值告警之前（可操作 > 仅需知晓）。
+- 前端包瘦身：移除 react-aria-components 依赖，Button/Modal/Select/Segmented 换为轻量
+  自实现（保留 portal、焦点圈禁、键盘导航、aria 语义），主包 gzip 140.7KB → 86.7KB，
+  总量约 90KB，达成 120KB 目标。
+
 ## v0.1.10 — 2026-08-11
 
 液态玻璃高保真化：物理透镜剖面 + 真分通道色散 + 立体感厚度。

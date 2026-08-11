@@ -1,4 +1,5 @@
-import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { Button } from "./button";
+import { Dialog, Modal, ModalOverlay } from "./modal";
 import type { ReactNode } from "react";
 import { GlassSurface } from "./glass";
 

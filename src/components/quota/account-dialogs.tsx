@@ -1,5 +1,6 @@
 import { Check, KeyRound } from "lucide-react";
-import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { Button } from "../ui/button";
+import { Dialog, Modal, ModalOverlay } from "../ui/modal";
 import { useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../../lib/quota-client";
 import type { AccountConnectionView } from "../../lib/quota-types";

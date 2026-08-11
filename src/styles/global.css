@@ -486,7 +486,7 @@ body {
   color: var(--ink-2);
 }
 
-.nav-button[data-hovered] {
+.nav-button:hover {
   color: var(--ink-1);
   background: rgba(255, 255, 255, 0.16);
 }
@@ -546,15 +546,15 @@ body {
     box-shadow var(--dur-fast) var(--ease);
 }
 
-.btn[data-hovered] {
+.btn:hover {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.btn[data-pressed] {
+.btn:active {
   transform: scale(0.975);
 }
 
-.btn[data-disabled] {
+.btn:disabled {
   opacity: 0.42;
   pointer-events: none;
 }
@@ -600,8 +600,8 @@ body {
   -webkit-backdrop-filter: blur(12px) saturate(1.18);
 }
 
-.btn-prominent[data-hovered],
-.btn-accent[data-hovered] {
+.btn-prominent:hover,
+.btn-accent:hover {
   background: rgba(38, 103, 218, 0.94);
 }
 
@@ -614,7 +614,7 @@ body {
     0 6px 16px color-mix(in srgb, var(--crit) 24%, transparent);
 }
 
-.btn-danger[data-hovered] {
+.btn-danger:hover {
   background: color-mix(in srgb, var(--crit) 96%, #5c161f);
 }
 
@@ -656,7 +656,7 @@ body {
   transform: translateY(0);
 }
 
-.btn-icon[data-hovered] {
+.btn-icon:hover {
   color: var(--ink-1);
   background: var(--accent-softer);
 }
@@ -684,11 +684,11 @@ body {
     border-color var(--dur-fast) var(--ease);
 }
 
-.select-trigger[data-hovered] {
+.select-trigger:hover {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.select-trigger[data-focus-visible] {
+.select-trigger:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -747,7 +747,7 @@ body {
   cursor: default;
 }
 
-.select-option[data-hovered],
+.select-option:hover,
 .select-option[data-focused] {
   background: var(--accent-soft);
 }
@@ -1191,7 +1191,7 @@ body {
   display: none;
 }
 
-::root[data-theme="dark"] .quota-track {
+:root[data-theme="dark"] .quota-track {
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(255, 255, 255, 0.08) 100%),
     rgba(20, 24, 22, 0.6);
@@ -1290,7 +1290,7 @@ input:checked ~ .toggle-thumb {
 
 /* ---------- Dialog ---------- */
 
-[data-react-aria-modal-overlay] {
+.modal-overlay {
   background: rgba(14, 17, 15, 0.3) !important;
   backdrop-filter: blur(10px) saturate(0.85) !important;
   -webkit-backdrop-filter: blur(10px) saturate(0.85) !important;

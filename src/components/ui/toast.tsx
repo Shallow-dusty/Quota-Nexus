@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { Button } from "react-aria-components";
+import { Button } from "./button";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { GlassSurface } from "./glass";
 

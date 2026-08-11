@@ -7,7 +7,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Button } from "react-aria-components";
+import { Button } from "../ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { commandErrorMessage, quotaClient } from "../../lib/quota-client";
 import { ERROR_HINT, ERROR_LABEL } from "../../lib/quota-copy";
