@@ -204,7 +204,7 @@ export function OverviewPage({
               ]}
             />
             <div className="ml-auto flex items-center gap-2">
-              <span className="tnum text-[11px] text-ink-3">
+              <span className="tnum text-[11px] text-ink-2">
                 上次刷新 {formatTime(refreshedAt)}
               </span>
               <GlassSelect

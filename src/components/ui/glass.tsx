@@ -105,7 +105,7 @@ function sub(parent: Element, name: string, attrs: Record<string, string | numbe
 function applyGlassFilter(
   el: HTMLElement,
   maps: ReturnType<typeof buildGlassMaps>,
-  { blur, saturate }: { blur: number; saturate: number },
+  { blur, saturate }: { blur: string; saturate: string },
 ): () => void {
   const defs = ensureDefs();
   const id = `qn-glass-${++seq}`;
@@ -215,7 +215,7 @@ function applyGlassFilter(
   });
 
   // Refraction handles the edge lens; a small blur keeps the centre legible
-  const chain = `blur(${blur}px) saturate(${saturate}) url(#${id})`;
+  const chain = `blur(${blur}) saturate(${saturate}) url(#${id})`;
   el.style.backdropFilter = chain;
   el.style.setProperty("-webkit-backdrop-filter", chain);
 
@@ -224,8 +224,8 @@ function applyGlassFilter(
   };
 }
 
-function applyPlain(el: HTMLElement, { blur, saturate }: { blur: number; saturate: number }): void {
-  const chain = `blur(${blur}px) saturate(${saturate})`;
+function applyPlain(el: HTMLElement, { blur, saturate }: { blur: string; saturate: string }): void {
+  const chain = `blur(${blur}) saturate(${saturate})`;
   el.style.backdropFilter = chain;
   el.style.setProperty("-webkit-backdrop-filter", chain);
 }
@@ -235,8 +235,8 @@ function applyPlain(el: HTMLElement, { blur, saturate }: { blur: number; saturat
 export function GlassSurface<T extends ElementType = "div">({
   as,
   radius = 20,
-  blur = 7,
-  saturate = 1.42,
+  blur,
+  saturate,
   glass,
   className,
   style,
@@ -244,13 +244,16 @@ export function GlassSurface<T extends ElementType = "div">({
   ...props
 }: GlassSurfaceProps<T> & Omit<ComponentPropsWithoutRef<T>, keyof GlassSurfaceProps<T>>) {
   const ref = useRef<HTMLElement | null>(null);
+  // 未显式传参时走主题 token（--glass-blur/--glass-saturate，暗色主题更深更低保和）
+  const blurCss = blur != null ? `${blur}px` : "var(--glass-blur)";
+  const saturateCss = saturate != null ? String(saturate) : "var(--glass-saturate)";
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
     if (!glassEnabled()) {
-      applyPlain(el, { blur: Math.max(blur, 12), saturate });
+      applyPlain(el, { blur: blurCss, saturate: saturateCss });
       return;
     }
 
@@ -270,7 +273,7 @@ export function GlassSurface<T extends ElementType = "div">({
         resolution: 0.6,
         ...glass,
       });
-      dispose = applyGlassFilter(el, maps, { blur, saturate });
+      dispose = applyGlassFilter(el, maps, { blur: blurCss, saturate: saturateCss });
     };
     const schedule = () => {
       cancelAnimationFrame(raf);
