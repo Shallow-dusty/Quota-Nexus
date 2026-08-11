@@ -1,6 +1,7 @@
 import {
   useEffect,
   useRef,
+  useState,
   type ComponentPropsWithoutRef,
   type CSSProperties,
   type ElementType,
@@ -232,6 +233,24 @@ function applyPlain(el: HTMLElement, { blur, saturate }: { blur: string; saturat
 
 /* ---------- component ---------- */
 
+/** 跟踪根元素 data-theme（切换主题时折射强度等需要重建滤镜） */
+function useDocumentTheme(): string {
+  const [theme, setTheme] = useState(
+    () => document.documentElement.dataset.theme ?? "light",
+  );
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setTheme(document.documentElement.dataset.theme ?? "light"),
+    );
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
+}
+
 export function GlassSurface<T extends ElementType = "div">({
   as,
   radius = 20,
@@ -247,12 +266,16 @@ export function GlassSurface<T extends ElementType = "div">({
   // 未显式传参时走主题 token（--glass-blur/--glass-saturate，暗色主题更深更低保和）
   const blurCss = blur != null ? `${blur}px` : "var(--glass-blur)";
   const saturateCss = saturate != null ? String(saturate) : "var(--glass-saturate)";
+  // 暗色主题走纯模糊路径（见下方 effect），折射参数无需按主题区分
+  const theme = useDocumentTheme();
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    if (!glassEnabled()) {
+    // 暗色主题走纯模糊路径：SVG 折射链在低亮度背景上会把背景结构放大成“污渍”，
+    // 且暗色下透镜边几不可见——立体感由 CSS rim/阴影层承担。
+    if (!glassEnabled() || theme === "dark") {
       applyPlain(el, { blur: blurCss, saturate: saturateCss });
       return;
     }
@@ -290,7 +313,7 @@ export function GlassSurface<T extends ElementType = "div">({
     };
     // radius/blur/saturate/glass changes re-run via parent re-render + key usage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radius, blur, saturate, JSON.stringify(glass ?? {})]);
+  }, [radius, blur, saturate, theme, JSON.stringify(glass ?? {})]);
 
   const Component = (as ?? "div") as ElementType;
   return (

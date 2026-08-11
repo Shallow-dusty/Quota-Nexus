@@ -1,6 +1,6 @@
 [package]
 name = "quota-nexus"
-version = "0.1.12"
+version = "0.1.13"
 description = "Local multi-provider quota monitor"
 edition.workspace = true
 license.workspace = true
