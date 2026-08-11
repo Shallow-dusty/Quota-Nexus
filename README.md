@@ -13,7 +13,7 @@ Ollama Cloud 和 ClinePass 账号聚合到同一套界面。当前版本聚焦�
 
 > **发布状态（2026-08-11）**：公开 Release 目前停留在 v0.1.0（发布时产品名为
 > AI Quota Monitor，资产名 `AI-Quota-Monitor_0.1.0_..._UNSIGNED.exe`）。更名后的
-> Quota Nexus（当前 v0.1.8）暂未发布公开安装包，需本地执行 `pnpm desktop:build`
+> Quota Nexus（当前 v0.1.10）暂未发布公开安装包，需本地执行 `pnpm desktop:build`
 > 构建；v0.1.1 起的安装器会在安装前自动卸载旧版 AI Quota Monitor，不会双版本并存。
 
 在 [GitHub Releases](https://github.com/Shallow-dusty/Quota-Nexus/releases/latest) 下载
@@ -33,8 +33,8 @@ Ollama Cloud 和 ClinePass 账号聚合到同一套界面。当前版本聚焦�
 - 手工录入或更新凭据（支持直接粘贴 Firefox 请求头 JSON）、同 Provider 凭据复用、
   OpenCode Workspace 自动发现、账号暂停/恢复、
   本地删除，以及 Credential 级固定 HTTP(S)/SOCKS5(H) 出口。
-- 单账号 7/30/90 天历史趋势、Warning/High/Critical Windows 通知、成功投递确认与失败重试、
-  脱敏快照 JSON 和诊断 ZIP 导出。
+- 单账号 7/30/90 天历史趋势、Warning/High/Critical Windows 通知（状态代次去重、重新越线
+  2 小时冷却、可整体关闭）、成功投递确认与失败重试、脱敏快照 JSON 和诊断 ZIP 导出。
 - 托盘运行、开机自启、截图隐私、浅色/深色/实色/高对比/减少动态适配。
 - Windows Credential Manager 保存 Provider 秘密和代理认证；SQLite 只保存业务元数据、额度、
   历史、调度和告警状态。

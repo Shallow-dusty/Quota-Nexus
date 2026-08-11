@@ -52,7 +52,7 @@ Quota Nexus 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放进�
 - Tauri 2 + Windows WebView2 + NSIS。
 - Rust、reqwest、sqlx/SQLite、keyring、Tauri plugins。
 - React 19、TypeScript、Vite、Tailwind CSS 4、React Aria、Lucide。
-- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 当前约 138KB gzip（超出 120KB 目标，待瘦身）。
+- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 当前约 139KB gzip（超出 120KB 目标，待瘦身）。
 - Windows Credential Manager 保存 Provider 秘密和代理认证。
 
 前端没有第二个调度器。页面只读取 Rust Core DTO，并监听 `overview-updated` 事件；领域
@@ -271,7 +271,7 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 - [x] 认证失效、陈旧、固定出口、解析、暂停、空状态均有文字/图标表现。
 - [x] 图表有等效数据表。
 - [x] 50 张额度卡全量渲染与滚动检查；当前无头回归环境首屏低于 2 秒。
-- [ ] 生产 JS gzip 低于 120KB：v0.1.8 实测约 138KB（主包 135KB + 异步块 3KB），超限待瘦身。
+- [ ] 生产 JS gzip 低于 120KB：v0.1.10 实测约 139KB（主包 135.7KB + 异步块 3KB），超限待瘦身。
 
 ### 10.4 当前证据
 
@@ -280,9 +280,9 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 | `pnpm test` | 7/7（2026-08-11 复验；删除两个死代码用例后为 7） |
 | `cargo test --lib` | 33 通过、5 忽略（2026-08-11 复验）；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
 | `cargo clippy --all-targets -- -D warnings` | 通过 |
-| `pnpm build` | 通过，JS 约 102KB gzip |
-| `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过 |
-| 真实本机数据 | 代码目标 schema 6；已安装实例当前为 schema 5、5 账号在库（2026-08-11 复核），升级后启动时自动迁移；三家 Provider 曾完成真实刷新 |
+| `pnpm build` | 通过，JS 约 139KB gzip（2026-08-11 实测，超出 120KB 目标） |
+| `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过（2026-08-11 复验） |
+| 真实本机数据 | 已安装实例（v0.1.10）完成 schema 6 迁移，5 账号在库并真实刷新；OpenCode 百分比误读修复经生产数据验证（Yunara 周额度 100%→2%）（2026-08-11 复核） |
 
 ## 11. 后续演进
 

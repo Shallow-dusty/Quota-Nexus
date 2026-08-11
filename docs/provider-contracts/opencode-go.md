@@ -41,10 +41,12 @@
 
 - 窗口字段：`rollingUsage` / `weeklyUsage` / `monthlyUsage` 各自包含
   `usagePercent: number` 与 `resetInSec: number`；本次三类窗口均存在。
-- 百分比方向与量级已确认：`usagePercent` = 已用，当前账号原始值为 **0–100 百分比**：
-  rolling 5h = 3、weekly = 84、monthly = 42。仍保留社区实现的 `≤1 → ×100`
-  兼容逻辑，以应对服务端不同版本。第二个独立会话实测为 rolling 5h = 0、
-  weekly = 86、monthly = 44，方向和量级一致。
+- 百分比方向与量级已确认：`usagePercent` = 已用，原始值为 **0–100 百分比**：
+  rolling 5h = 3、weekly = 84、monthly = 42。第二个独立会话实测为 rolling 5h = 0、
+  weekly = 86、monthly = 44，方向和量级一致。**解析必须按百分比直取**：早期保留的
+  社区 `≤1 → ×100` 分数兼容启发式在 2026-08 被生产数据证伪——百分比 `1`（周额度刚
+  重置）被误读为已用 100% 并触发误报告警；v0.1.9 已删除该启发式。若服务端未来真返回
+  0–1 小数制，显示值会缩小 100 倍，属可见易查的失败模式，优于谎报耗尽。
 - 重置语义：`resetInSec` 为**相对秒数（滑动）**，重置时刻 = `now + resetInSec`
   由客户端现算——与 DESIGN.md 状态代次去重决策一致，不得把 resetsAt 当周期身份；
   相邻轮询的递减形态仍待复测。
