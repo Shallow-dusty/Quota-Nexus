@@ -76,16 +76,21 @@
     0 30px 90px rgba(32, 39, 34, 0.25);
 
   --glass-bg: rgba(255, 255, 255, 0.48);
-  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.45) 40%, rgba(255, 255, 255, 0.05) 100%);
+  /* 凸面软垫高光 + 斜向渐变：让玻璃表面读起来微微隆起 */
+  --glass-sheen:
+    radial-gradient(130% 100% at 28% -10%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.45) 40%, rgba(255, 255, 255, 0.05) 100%);
+  /* 顶部入射光带 + 底部内阴影 = 玻璃厚度（立体感） */
   --glass-edge:
-    inset 0 2px 3px 0 #ffffff,
+    inset 0 2.5px 3px 0 #ffffff,
     inset 2px 0 3px 0 rgba(255, 255, 255, 0.92),
-    inset 0 -5px 18px 0 rgba(160, 195, 235, 0.22),
+    inset 0 14px 22px -12px rgba(255, 255, 255, 0.6),
+    inset 0 -16px 24px -12px rgba(35, 55, 105, 0.30),
     inset -1.5px -1.5px 3px 0 rgba(0, 0, 0, 0.04);
   --glass-outline: rgba(255, 255, 255, 0.95);
   --glass-shadow:
-    0 20px 50px -10px rgba(70, 110, 180, 0.16),
-    0 6px 18px -2px rgba(30, 60, 120, 0.08);
+    0 24px 60px -10px rgba(70, 110, 180, 0.22),
+    0 6px 18px -2px rgba(30, 60, 120, 0.10);
   --glass-solid: #f7f8f6;
 
   --r-sm: 8px;
@@ -165,10 +170,14 @@
     0 34px 100px rgba(0, 0, 0, 0.65);
 
   --glass-bg: rgba(255, 255, 255, 0.07);
-  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 35%, rgba(255, 255, 255, 0) 70%);
+  --glass-sheen:
+    radial-gradient(130% 100% at 28% -10%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 35%, rgba(255, 255, 255, 0) 70%);
   --glass-edge:
-    inset 0 2px 2px 0 rgba(255, 255, 255, 0.45),
-    inset 2px 0 2px 0 rgba(255, 255, 255, 0.30),
+    inset 0 2px 2px 0 rgba(255, 255, 255, 0.5),
+    inset 2px 0 2px 0 rgba(255, 255, 255, 0.32),
+    inset 0 14px 22px -12px rgba(255, 255, 255, 0.14),
+    inset 0 -16px 24px -10px rgba(0, 0, 0, 0.55),
     inset -1.5px -1.5px 3px 0 rgba(0, 0, 0, 0.45);
   --glass-outline: rgba(255, 255, 255, 0.18);
   --glass-shadow:

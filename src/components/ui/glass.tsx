@@ -119,7 +119,9 @@ function applyGlassFilter(
   filter.setAttribute("colorInterpolationFilters", "sRGB");
   defs.appendChild(filter);
 
-  // 1. Refraction: displace backdrop in the 24px chamfer edge
+  // 1. Refraction with per-channel dispersion: R/B channels are displaced
+  // ±9% around G, so chromatic fringing appears only where displacement is
+  // non-zero (the bevelled edge) — physical, no artificial mask needed.
   sub(filter, "feImage", {
     href: maps.dispUrl,
     x: 0,
@@ -129,36 +131,74 @@ function applyGlassFilter(
     preserveAspectRatio: "none",
     result: "dispmap",
   });
+  const dispStrong = (maps.maxDisp * 1.09).toFixed(2);
+  const dispWeak = (maps.maxDisp * 0.91).toFixed(2);
+  sub(filter, "feDisplacementMap", {
+    in: "SourceGraphic",
+    in2: "dispmap",
+    scale: dispStrong,
+    xChannelSelector: "R",
+    yChannelSelector: "G",
+    result: "dispR",
+  });
   sub(filter, "feDisplacementMap", {
     in: "SourceGraphic",
     in2: "dispmap",
     scale: maps.maxDisp,
     xChannelSelector: "R",
     yChannelSelector: "G",
+    result: "dispG",
+  });
+  sub(filter, "feDisplacementMap", {
+    in: "SourceGraphic",
+    in2: "dispmap",
+    scale: dispWeak,
+    xChannelSelector: "R",
+    yChannelSelector: "G",
+    result: "dispB",
+  });
+  // Keep alpha on every channel: SVG filters run on premultiplied colors, so an
+  // alpha=0 channel would lose its RGB contribution in the arithmetic sum.
+  sub(filter, "feColorMatrix", {
+    in: "dispR",
+    type: "matrix",
+    values: "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1",
+    result: "chR",
+  });
+  sub(filter, "feColorMatrix", {
+    in: "dispG",
+    type: "matrix",
+    values: "0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 0 1",
+    result: "chG",
+  });
+  sub(filter, "feColorMatrix", {
+    in: "dispB",
+    type: "matrix",
+    values: "0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 0 1",
+    result: "chB",
+  });
+  sub(filter, "feComposite", {
+    in: "chR",
+    in2: "chG",
+    operator: "arithmetic",
+    k1: 0,
+    k2: 1,
+    k3: 1,
+    k4: 0,
+    result: "rg",
+  });
+  sub(filter, "feComposite", {
+    in: "rg",
+    in2: "chB",
+    operator: "arithmetic",
+    k1: 0,
+    k2: 1,
+    k3: 1,
+    k4: 0,
     result: "refracted",
   });
 
-  // 2. Chromatic Aberration: Red (+2px) and Blue (-2px) optical channel offset
-  sub(filter, "feOffset", {
-    in: "refracted",
-    dx: 2.0,
-    dy: -1.0,
-    result: "redShift",
-  });
-  sub(filter, "feColorMatrix", {
-    in: "redShift",
-    type: "matrix",
-    values: "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0",
-    result: "redOnly",
-  });
-  sub(filter, "feBlend", {
-    in: "refracted",
-    in2: "redOnly",
-    mode: "screen",
-    result: "chromatic",
-  });
-
-  // 3. Specular rim highlight: blend onto the prism edge
+  // 2. Dual-band specular rim (crisp edge + soft incident band) via screen blend
   sub(filter, "feImage", {
     href: maps.specUrl,
     x: 0,
@@ -169,12 +209,12 @@ function applyGlassFilter(
     result: "specmap",
   });
   sub(filter, "feBlend", {
-    in: "chromatic",
+    in: "refracted",
     in2: "specmap",
     mode: "screen",
   });
 
-  // Crystal transparency: extremely low blur (1.5px) keeps center 100% sharp & vivid
+  // Refraction handles the edge lens; a small blur keeps the centre legible
   const chain = `blur(${blur}px) saturate(${saturate}) url(#${id})`;
   el.style.backdropFilter = chain;
   el.style.setProperty("-webkit-backdrop-filter", chain);
@@ -195,8 +235,8 @@ function applyPlain(el: HTMLElement, { blur, saturate }: { blur: number; saturat
 export function GlassSurface<T extends ElementType = "div">({
   as,
   radius = 20,
-  blur = 1.5,
-  saturate = 1.6,
+  blur = 7,
+  saturate = 1.42,
   glass,
   className,
   style,
