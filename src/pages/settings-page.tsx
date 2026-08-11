@@ -196,6 +196,12 @@ export function SettingsPage({
                 onCommit={(criticalThreshold) => save({ criticalThreshold })}
               />
             </div>
+            <Row label="额度阈值通知" hint="越过 Warning/High/Critical 时通知；同一窗口重新越线 2 小时内不重复">
+              <Toggle
+                value={settings?.notifyQuota ?? true}
+                onChange={(notifyQuota) => save({ notifyQuota })}
+              />
+            </Row>
             <Row label="认证失效通知" hint="首次检测时通知，之后按状态代次去重">
               <Toggle
                 value={settings?.notifyAuth ?? true}

@@ -153,11 +153,10 @@ fn parse_usage(body: &str) -> Result<Vec<QuotaWindowView>, CommandError> {
     let mut windows = Vec::new();
     for (source, kind, label) in candidates {
         if let Some((raw_percent, reset_seconds)) = grab_window(body, source) {
-            let used_percent = if raw_percent <= 1.0 {
-                raw_percent * 100.0
-            } else {
-                raw_percent
-            };
+            // usagePercent 已验证为 0–100 百分比制（docs/provider-contracts/opencode-go.md）。
+            // 不要对小数做“分数制(0–1)”猜测换算：百分比 1 会被误判为 100%，
+            // 低用量窗口（如周额度刚重置）会被谎报为耗尽。
+            let used_percent = raw_percent;
             if !(0.0..=100.0).contains(&used_percent) {
                 return Err(CommandError::parser("OpenCode Go 返回了越界使用率"));
             }
@@ -225,7 +224,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_verified_windows_and_fraction_compatibility() {
+    fn parses_verified_windows_as_percent_scale() {
         let body = r#"
           {"rollingUsage":{"usagePercent":0.25,"resetInSec":1800},
            "weeklyUsage":{"usagePercent":84,"resetInSec":86400},
@@ -233,9 +232,23 @@ mod tests {
         "#;
         let windows = parse_usage(body).unwrap();
         assert_eq!(windows.len(), 3);
-        assert_eq!(windows[0].used_percent, 25.0);
+        // 0–100 百分比制直传，不做分数制换算
+        assert_eq!(windows[0].used_percent, 0.25);
         assert_eq!(windows[1].used_percent, 84.0);
         assert!(windows[0].resets_at.is_some());
+    }
+
+    #[test]
+    fn percent_one_is_not_misread_as_full() {
+        // 回归：usagePercent=1 表示已用 1%，曾被分数启发式误读为 100%。
+        let body = r#"
+          {"rollingUsage":{"usagePercent":0,"resetInSec":1800},
+           "weeklyUsage":{"usagePercent":1,"resetInSec":508063},
+           "monthlyUsage":{"usagePercent":74,"resetInSec":1586941}}
+        "#;
+        let windows = parse_usage(body).unwrap();
+        assert_eq!(windows[1].used_percent, 1.0);
+        assert_eq!(windows[2].used_percent, 74.0);
     }
 
     #[test]

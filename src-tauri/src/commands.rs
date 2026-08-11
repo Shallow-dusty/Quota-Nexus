@@ -1107,6 +1107,7 @@ mod tests {
             notify_auth: true,
             notify_stale: true,
             notify_recovery: false,
+            notify_quota: true,
         };
         let entries =
             diagnostic_entries(manifest, health, settings, sanitized_snapshot(&overview)).unwrap();

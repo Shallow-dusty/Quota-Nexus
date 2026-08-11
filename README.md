@@ -39,7 +39,7 @@ Ollama Cloud 和 ClinePass 账号聚合到同一套界面。当前版本聚焦�
 - Windows Credential Manager 保存 Provider 秘密和代理认证；SQLite 只保存业务元数据、额度、
   历史、调度和告警状态。
 
-当前代码数据库版本为 schema 5，已有本机数据会在下次启动时无损迁移。Ollama Cloud 默认使用 API Key 查询
+当前代码数据库版本为 schema 6，已有本机数据会在下次启动时无损迁移。Ollama Cloud 默认使用 API Key 查询
 `/api/usage`，同时保留设置页 Cookie 兼容路径；ClinePass 和两个 OpenCode Go
 账号均完成真实后台刷新验证。自动验收覆盖三家各 5 个账号、50 卡片渲染、告警去重、历史、
 退避、熔断、凭据共享删除、代理失败不回退、诊断脱敏和视觉矩阵。

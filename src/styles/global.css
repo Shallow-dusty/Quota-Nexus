@@ -1653,3 +1653,65 @@ input:checked ~ .toggle-thumb {
     display: none !important;
   }
 }
+
+/* ---------- 窗口控制（无边框窗口的右上标准三键） ---------- */
+
+.window-control {
+  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-2);
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.window-control:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--ink-1);
+}
+
+.window-control:active {
+  background: rgba(15, 23, 42, 0.14);
+}
+
+.window-control-close:hover {
+  background: #e81123;
+  color: #ffffff;
+}
+
+.window-control-close:active {
+  background: #c42b1c;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .window-control:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink-1);
+}
+
+:root[data-theme="dark"] .window-control:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+:root[data-theme="dark"] .window-control-close:hover {
+  background: #e81123;
+  color: #ffffff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window-control {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .window-control {
+    color: CanvasText;
+  }
+  .window-control:hover,
+  .window-control-close:hover,
+  .window-control-close:active {
+    background: Highlight;
+    color: HighlightText;
+  }
+}

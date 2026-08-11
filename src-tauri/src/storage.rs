@@ -138,6 +138,7 @@ pub struct AppSettingsRecord {
     pub notify_auth: bool,
     pub notify_stale: bool,
     pub notify_recovery: bool,
+    pub notify_quota: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -157,6 +158,7 @@ struct QuotaAlertStateRow {
     generation: i64,
     pending_generation: Option<i64>,
     pending_state: Option<String>,
+    last_notified_at: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
@@ -1051,7 +1053,7 @@ pub async fn settings_record(pool: &SqlitePool) -> Result<AppSettingsRecord, Com
         "SELECT refresh_interval_minutes, adaptive_refresh, warning_threshold,
                 high_threshold, critical_threshold, history_days, tray_enabled,
                 autostart_enabled, privacy_mode, notify_auth, notify_stale,
-                notify_recovery
+                notify_recovery, notify_quota
          FROM app_settings WHERE id = 1",
     )
     .fetch_one(pool)
@@ -1074,6 +1076,7 @@ pub async fn settings(pool: &SqlitePool) -> Result<AppSettingsView, CommandError
         notify_auth: row.notify_auth,
         notify_stale: row.notify_stale,
         notify_recovery: row.notify_recovery,
+        notify_quota: row.notify_quota,
     })
 }
 
@@ -1112,7 +1115,7 @@ pub async fn update_settings(
            warning_threshold = ?, high_threshold = ?, critical_threshold = ?,
            history_days = ?, tray_enabled = ?, autostart_enabled = ?,
            privacy_mode = ?, notify_auth = ?, notify_stale = ?,
-           notify_recovery = ?, updated_at = ?
+           notify_recovery = ?, notify_quota = ?, updated_at = ?
          WHERE id = 1",
     )
     .bind(input.refresh_interval_minutes)
@@ -1127,6 +1130,7 @@ pub async fn update_settings(
     .bind(input.notify_auth)
     .bind(input.notify_stale)
     .bind(input.notify_recovery)
+    .bind(input.notify_quota)
     .bind(&now)
     .execute(&mut *tx)
     .await
@@ -1239,6 +1243,44 @@ pub async fn history(pool: &SqlitePool, days: i64) -> Result<Vec<HistoryPointVie
         .collect())
 }
 
+/// 同一窗口同一档位通知的最小间隔（重新越线不重复打扰；升级不受限）。
+const QUOTA_ALERT_COOLDOWN_HOURS: i64 = 2;
+
+/// 各窗口类型的标称长度（秒），用于区分 resets_at 的服务端漂移与真正的周期切换。
+fn window_span_seconds(kind: &str) -> i64 {
+    match kind {
+        "rolling_5h" => 5 * 3600,
+        "weekly" => 7 * 24 * 3600,
+        "monthly" => 30 * 24 * 3600,
+        "session" => 12 * 3600,
+        _ => 24 * 3600,
+    }
+}
+
+/// 判断通知周期是否真的切换。
+///
+/// ClinePass 的 resetsAt 由服务端按请求现算（请求时刻 + 剩余时长），每次刷新都
+/// 漂移数秒到数分钟；若把漂移误认为新周期，告警代次会被不断重置并重弹通知。
+/// 只有偏移超过窗口标称长度 1/4 才视为真正的周期重置——真重置必然偏移约一个
+/// 完整窗口长度，与漂移可干净区分。窗口闲置（resets_at 缺失）不失周期身份。
+fn quota_period_changed(kind: &str, previous: Option<&str>, current: &str) -> bool {
+    let Some(previous) = previous else {
+        return true;
+    };
+    if previous == current || previous == "unknown" || current == "unknown" {
+        return false;
+    }
+    match (
+        chrono::DateTime::parse_from_rfc3339(previous),
+        chrono::DateTime::parse_from_rfc3339(current),
+    ) {
+        (Ok(before), Ok(after)) => {
+            (after - before).num_seconds().abs() > window_span_seconds(kind) / 4
+        }
+        _ => previous != current,
+    }
+}
+
 pub async fn evaluate_quota_alerts(
     pool: &SqlitePool,
     account_id: &str,
@@ -1268,7 +1310,8 @@ pub async fn evaluate_quota_alerts(
             window.resets_at.as_deref().unwrap_or("unknown")
         };
         let existing = sqlx::query_as::<_, QuotaAlertStateRow>(
-            "SELECT state, period_key, generation, pending_generation, pending_state
+            "SELECT state, period_key, generation, pending_generation, pending_state,
+                    last_notified_at
              FROM alert_states WHERE account_id = ? AND alert_key = ?",
         )
         .bind(account_id)
@@ -1282,13 +1325,24 @@ pub async fn evaluate_quota_alerts(
             generation: 0,
             pending_generation: None,
             pending_state: None,
+            last_notified_at: None,
         });
         let mut previous = existing.state;
         let previous_period = existing.period_key;
         let mut generation = existing.generation;
         let previous_pending_generation = existing.pending_generation;
         let previous_pending_state = existing.pending_state;
-        let period_changed = previous_period.as_deref() != Some(period_key);
+        let period_changed =
+            quota_period_changed(&window.kind, previous_period.as_deref(), period_key);
+        // 未真正切换周期时采用新观测到的时间戳身份（随漂移滚动更新，但不递增代次）；
+        // 闲置窗口（resets_at 缺失）期间保留上一次的身份。
+        let stored_period_key = if period_key != "unknown" {
+            period_key.to_string()
+        } else {
+            previous_period
+                .clone()
+                .unwrap_or_else(|| period_key.to_string())
+        };
         if period_changed {
             previous = "normal".into();
             generation += 1;
@@ -1307,9 +1361,20 @@ pub async fn evaluate_quota_alerts(
         if !period_changed && previous_rank == 0 && next_rank > 0 {
             generation += 1;
         }
-        let notification_enabled = next_rank > 0 || settings.notify_recovery;
+        let notification_enabled =
+            settings.notify_quota && (next_rank > 0 || settings.notify_recovery);
+        // 冷却：重新越线（回落武装后再次超阈，含周期身份漂移的残余误判）时，
+        // 若最近 2 小时已通知过该窗口则不再打扰；Warning→High→Critical 升级不受限。
+        let recently_notified = existing
+            .last_notified_at
+            .as_deref()
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+            .map(|when| (Utc::now() - when.with_timezone(&Utc)).num_hours() < QUOTA_ALERT_COOLDOWN_HOURS)
+            .unwrap_or(false);
+        let re_entry = previous_rank == 0 && next_rank > 0;
         let starts_notification = notification_enabled
-            && (next_rank > previous_rank || (previous_rank > 0 && next_rank == 0));
+            && (next_rank > previous_rank || (previous_rank > 0 && next_rank == 0))
+            && !(re_entry && recently_notified);
         let (pending_generation, pending_state) = if starts_notification {
             (Some(generation), Some(next.to_string()))
         } else if notification_enabled
@@ -1367,7 +1432,7 @@ pub async fn evaluate_quota_alerts(
         )
         .bind(account_id)
         .bind(&key)
-        .bind(period_key)
+        .bind(&stored_period_key)
         .bind(generation)
         .bind(next)
         .bind(&now)
@@ -1859,6 +1924,7 @@ mod tests {
                 notify_auth: current.notify_auth,
                 notify_stale: current.notify_stale,
                 notify_recovery: current.notify_recovery,
+                notify_quota: current.notify_quota,
             }
         };
         assert_eq!(
@@ -1879,6 +1945,7 @@ mod tests {
             notify_auth: true,
             notify_stale: true,
             notify_recovery: false,
+            notify_quota: true,
         };
         update_settings(&pool, disabled).await.unwrap();
         assert!(refresh_targets(&pool, None, false)
@@ -1965,13 +2032,11 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
-        assert_eq!(
-            evaluate_quota_alerts(&pool, "account-test", &[quota_window(72.0)])
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
+        // 重新越线处于 2 小时冷却期内：状态照常推进，但不再重复打扰
+        assert!(evaluate_quota_alerts(&pool, "account-test", &[quota_window(72.0)])
+            .await
+            .unwrap()
+            .is_empty());
 
         let auth = evaluate_health_alert(&pool, "account-test", "auth")
             .await
@@ -2006,6 +2071,76 @@ mod tests {
         let mut next = quota_window(72.0);
         next.resets_at = Some("2026-08-03T00:00:05.900Z".into());
         assert!(evaluate_quota_alerts(&pool, "account-test", &[next])
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn clinepass_drifting_reset_timestamp_does_not_rearm_alerts() {
+        let pool = seeded_pool("clinepass").await;
+        let mut first = quota_window(97.0);
+        first.resets_at = Some("2026-08-12T16:24:15.938474961Z".into());
+        let event = evaluate_quota_alerts(&pool, "account-test", &[first])
+            .await
+            .unwrap()
+            .remove(0);
+        mark_alert_notified(&pool, &event).await.unwrap();
+
+        // ClinePass 的 resetsAt 由服务端按请求现算，漂移数分钟不是新周期
+        let mut drifted = quota_window(97.0);
+        drifted.resets_at = Some("2026-08-12T16:29:02.113842055Z".into());
+        assert!(evaluate_quota_alerts(&pool, "account-test", &[drifted])
+            .await
+            .unwrap()
+            .is_empty());
+
+        // 真正的周期重置（偏移约一个完整窗口）仍会重新武装；越过冷却期后可再通知
+        sqlx::query(
+            "UPDATE alert_states SET last_notified_at = ?
+             WHERE account_id = ? AND alert_key = 'quota:weekly'",
+        )
+        .bind("2026-08-01T00:00:00Z")
+        .bind("account-test")
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut reset = quota_window(97.0);
+        reset.resets_at = Some("2026-08-19T16:24:15.938474961Z".into());
+        assert_eq!(
+            evaluate_quota_alerts(&pool, "account-test", &[reset])
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn quota_alerts_respect_master_switch() {
+        let pool = seeded_pool("clinepass").await;
+        let current = settings(&pool).await.unwrap();
+        update_settings(
+            &pool,
+            UpdateSettingsInput {
+                refresh_interval_minutes: current.refresh_interval_minutes,
+                adaptive_refresh: current.adaptive_refresh,
+                warning_threshold: current.warning_threshold,
+                high_threshold: current.high_threshold,
+                critical_threshold: current.critical_threshold,
+                history_days: current.history_days,
+                tray_enabled: current.tray_enabled,
+                autostart_enabled: current.autostart_enabled,
+                privacy_mode: current.privacy_mode,
+                notify_auth: current.notify_auth,
+                notify_stale: current.notify_stale,
+                notify_recovery: current.notify_recovery,
+                notify_quota: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(evaluate_quota_alerts(&pool, "account-test", &[quota_window(99.0)])
             .await
             .unwrap()
             .is_empty());

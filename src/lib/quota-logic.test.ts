@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  attentionWindowCount,
   clampPercent,
-  healthyAccountCount,
-  highestWindow,
   remainingPercent,
   sortAccounts,
   sortByRisk,
@@ -65,18 +62,6 @@ describe("账号健康与排序（档位由 Core 下发）", () => {
     expect(toneForAccount(account({ state: "stale-with-error" }))).toBe("stale");
   });
 
-  it("最高风险窗口不来自陈旧账号", () => {
-    const accounts = [
-      account({
-        id: "stale",
-        state: "stale-with-error",
-        windows: [win(99, "critical")],
-      }),
-      account({ id: "ok", windows: [win(72, "warning")] }),
-    ];
-    expect(highestWindow(accounts)?.account.id).toBe("ok");
-  });
-
   it("按风险排序：critical 在 warning 之前", () => {
     const accounts = [
       account({ id: "warn", windows: [win(72, "warning")] }),
@@ -115,21 +100,5 @@ describe("概览排序", () => {
       "b-opencode",
       "c-ollama",
     ]);
-  });
-});
-
-describe("摘要统计", () => {
-  it("需关注窗口数与正常账号数", () => {
-    const accounts = [
-      account({ id: "ok", windows: [win(40, "normal")] }),
-      account({ id: "warn", windows: [win(72, "warning")] }),
-      account({
-        id: "stale",
-        state: "stale-with-error",
-        windows: [win(99, "critical")],
-      }),
-    ];
-    expect(attentionWindowCount(accounts)).toBe(1);
-    expect(healthyAccountCount(accounts)).toBe(1);
   });
 });

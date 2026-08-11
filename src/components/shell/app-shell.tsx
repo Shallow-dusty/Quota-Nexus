@@ -1,9 +1,12 @@
 import {
   Cable,
   LayoutDashboard,
+  Minus,
   PanelLeftClose,
   PanelLeftOpen,
   Settings2,
+  Square,
+  X,
 } from "lucide-react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { Button } from "react-aria-components";
@@ -54,32 +57,7 @@ export function AppShell({
           collapsed ? "w-16" : "w-56"
         }`}
       >
-        <div className="sidebar-top flex flex-col pt-3 px-4 gap-2" data-tauri-drag-region>
-          {/* macOS window control decoration matching design reference */}
-          <div className="window-dots flex items-center gap-2 mb-1">
-            <button
-              type="button"
-              onClick={() => handleWindowAction("close")}
-              className="w-3 h-3 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
-              aria-label="关闭窗口"
-              title="关闭窗口"
-            />
-            <button
-              type="button"
-              onClick={() => handleWindowAction("minimize")}
-              className="w-3 h-3 rounded-full bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
-              aria-label="最小化窗口"
-              title="最小化窗口"
-            />
-            <button
-              type="button"
-              onClick={() => handleWindowAction("maximize")}
-              className="w-3 h-3 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
-              aria-label="最大化/还原窗口"
-              title="最大化/还原窗口"
-            />
-          </div>
-
+        <div className="sidebar-top flex flex-col pt-3 px-4 gap-2" data-tauri-drag-region="deep">
           <div
             className={`app-brand flex items-center gap-2.5 h-12 shrink-0 ${
               collapsed ? "justify-center !px-0" : "!px-0"
@@ -135,8 +113,47 @@ export function AppShell({
       </GlassSurface>
 
       <main className="workspace-stage flex-1 min-w-0 flex flex-col">
+        <div className="window-chrome z-40 flex h-9 shrink-0 items-stretch">
+          <div className="flex-1" data-tauri-drag-region="deep" />
+          <WindowControls />
+        </div>
         {children}
       </main>
+    </div>
+  );
+}
+
+/** Windows 风格窗口控制：右上角标准三键（最小化/最大化/关闭）。 */
+function WindowControls() {
+  return (
+    <div className="window-controls flex h-9 shrink-0 items-stretch select-none">
+      <button
+        type="button"
+        className="window-control"
+        onClick={() => handleWindowAction("minimize")}
+        aria-label="最小化"
+        title="最小化"
+      >
+        <Minus size={15} />
+      </button>
+      <button
+        type="button"
+        className="window-control"
+        onClick={() => handleWindowAction("maximize")}
+        aria-label="最大化或还原"
+        title="最大化/还原"
+      >
+        <Square size={12} />
+      </button>
+      <button
+        type="button"
+        className="window-control window-control-close"
+        onClick={() => handleWindowAction("close")}
+        aria-label="关闭"
+        title="关闭"
+      >
+        <X size={16} />
+      </button>
     </div>
   );
 }

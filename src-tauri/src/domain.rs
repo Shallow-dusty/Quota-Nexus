@@ -131,6 +131,7 @@ pub struct AppSettingsView {
     pub notify_auth: bool,
     pub notify_stale: bool,
     pub notify_recovery: bool,
+    pub notify_quota: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -148,6 +149,7 @@ pub struct UpdateSettingsInput {
     pub notify_auth: bool,
     pub notify_stale: bool,
     pub notify_recovery: bool,
+    pub notify_quota: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -136,4 +136,5 @@ export interface AppSettingsView {
   notifyAuth: boolean;
   notifyStale: boolean;
   notifyRecovery: boolean;
+  notifyQuota: boolean;
 }

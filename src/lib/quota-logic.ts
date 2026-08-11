@@ -27,60 +27,6 @@ export function toneForAccount(account: ServiceQuotaView): HealthTone {
   }, "normal");
 }
 
-export function highestWindow(accounts: ServiceQuotaView[]): {
-  account: ServiceQuotaView;
-  window: QuotaWindowView;
-} | null {
-  const candidates = accounts
-    .filter((a) => !["stale-with-error", "paused"].includes(a.state))
-    .flatMap((account) =>
-      account.windows.map((window) => ({ account, window })),
-    );
-  return (
-    candidates.sort((a, b) => b.window.usedPercent - a.window.usedPercent)[0] ??
-    null
-  );
-}
-
-/** 需关注窗口数：档位达到 Warning 及以上的窗口（不含陈旧账号） */
-export function attentionWindowCount(accounts: ServiceQuotaView[]): number {
-  return accounts
-    .filter((a) => !["stale-with-error", "paused"].includes(a.state))
-    .flatMap((a) => a.windows)
-    .filter((w) => w.tone !== "normal").length;
-}
-
-/** 健康账号数：无错误状态且最高窗口低于 Warning */
-export function healthyAccountCount(accounts: ServiceQuotaView[]): number {
-  return accounts.filter(
-    (a) =>
-      !["stale-with-error", "paused"].includes(a.state) &&
-      toneForAccount(a) === "normal",
-  ).length;
-}
-
-/** 最近一次重置：resetsAt 最早且未过期太多的窗口 */
-export function nearestReset(accounts: ServiceQuotaView[]): {
-  account: ServiceQuotaView;
-  window: QuotaWindowView;
-} | null {
-  const now = Date.now();
-  const candidates = accounts
-    .flatMap((account) =>
-      account.windows.map((window) => ({ account, window })),
-    )
-    .filter(({ window }) => {
-      if (!window.resetsAt) return false;
-      const t = Date.parse(window.resetsAt);
-      return !Number.isNaN(t) && t > now - 60_000;
-    });
-  return (
-    candidates.sort(
-      (a, b) => Date.parse(a.window.resetsAt!) - Date.parse(b.window.resetsAt!),
-    )[0] ?? null
-  );
-}
-
 /** 卡片排序：最危险状态优先（DESIGN §8），同档按最高使用率降序 */
 export function sortByRisk(accounts: ServiceQuotaView[]): ServiceQuotaView[] {
   const maxUsed = (a: ServiceQuotaView) =>

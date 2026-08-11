@@ -164,6 +164,7 @@ class Phase0FixtureClient implements QuotaClient {
       notifyAuth: true,
       notifyStale: true,
       notifyRecovery: false,
+      notifyQuota: true,
     };
   }
 
