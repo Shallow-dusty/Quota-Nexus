@@ -3,8 +3,8 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 文档状态 | Implemented baseline |
-| 版本 | 0.1.0 |
-| 最后更新 | 2026-07-31 |
+| 版本 | 0.1.8 |
+| 最后更新 | 2026-08-11 |
 | 首要平台 | Windows 11 |
 | 产品形态 | 本地桌面应用 |
 
@@ -52,7 +52,7 @@ Quota Nexus 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放进�
 - Tauri 2 + Windows WebView2 + NSIS。
 - Rust、reqwest、sqlx/SQLite、keyring、Tauri plugins。
 - React 19、TypeScript、Vite、Tailwind CSS 4、React Aria、Lucide。
-- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 当前约 110KB gzip。
+- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 当前约 138KB gzip（超出 120KB 目标，待瘦身）。
 - Windows Credential Manager 保存 Provider 秘密和代理认证。
 
 前端没有第二个调度器。页面只读取 Rust Core DTO，并监听 `overview-updated` 事件；领域
@@ -212,6 +212,11 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 系统 Canvas/CanvasText/Highlight。截图隐私模式模糊账号标签和外部 ID。当前接受版本以 CSS
 和 SVG 材质实现，不把原生 Mica 作为 MVP 依赖，避免远程桌面和透明关闭时出现两套外观。
 
+窗口壳层（v0.1.8 起）为无边框透明窗口：`decorations: false` + `transparent: true`，
+移除 Windows 原生标题栏；侧栏顶部的红黄绿窗口控制直接调用系统最小化/最大化/关闭，
+侧栏顶部与全局顶栏通过 `data-tauri-drag-region` 承担窗口拖拽。透明关闭时壳层背景与
+所有材质表面一并回退实色，窗口控制能力不变。
+
 ## 9. Windows 集成与发布
 
 - 单实例插件：第二次启动唤起现有窗口，不创建第二个调度器。
@@ -257,18 +262,18 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 - [x] 认证失效、陈旧、固定出口、解析、暂停、空状态均有文字/图标表现。
 - [x] 图表有等效数据表。
 - [x] 50 张额度卡全量渲染与滚动检查；当前无头回归环境首屏低于 2 秒。
-- [x] 生产 JS gzip 约 102KB，低于 120KB 目标。
+- [ ] 生产 JS gzip 低于 120KB：v0.1.8 实测约 138KB（主包 135KB + 异步块 3KB），超限待瘦身。
 
 ### 10.4 当前证据
 
 | 检查 | 结果 |
 | --- | --- |
-| `pnpm test` | 6/6 |
+| `pnpm test` | 9/9（2026-08-11 复验） |
 | `cargo test --lib` | 28 通过、5 忽略；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
 | `cargo clippy --all-targets -- -D warnings` | 通过 |
 | `pnpm build` | 通过，JS 约 102KB gzip |
 | `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过 |
-| 真实本机数据 | 迁移目标 schema 5；已安装实例下次启动时升级；4 账号、三家 Provider 曾完成真实刷新 |
+| 真实本机数据 | 已安装实例完成 schema 5 迁移，5 账号在库（2026-08-11 复核）；三家 Provider 曾完成真实刷新 |
 
 ## 11. 后续演进
 
@@ -278,5 +283,6 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 - 账号操作、客户端联动和更细的通知规则。
 - 模型请求代理/路由或使用分析；若处理请求内容，需单独设计权限、保留与清理策略。
 - Linux/macOS 适配、公开签名发布和自动更新服务。
+- 前端 bundle 瘦身：v0.1.8 生产 JS gzip 约 138KB，需回到 120KB 目标内（见 §10.3）。
 
 新增能力不能把估算值冒充供应商真实额度，也不能绕过当前 Provider 请求作用域。

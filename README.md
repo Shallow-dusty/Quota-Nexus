@@ -11,6 +11,11 @@ Ollama Cloud 和 ClinePass 账号聚合到同一套界面。当前版本聚焦�
 
 ## 下载
 
+> **发布状态（2026-08-11）**：公开 Release 目前停留在 v0.1.0（发布时产品名为
+> AI Quota Monitor，资产名 `AI-Quota-Monitor_0.1.0_..._UNSIGNED.exe`）。更名后的
+> Quota Nexus（当前 v0.1.8）暂未发布公开安装包，需本地执行 `pnpm desktop:build`
+> 构建；v0.1.1 起的安装器会在安装前自动卸载旧版 AI Quota Monitor，不会双版本并存。
+
 在 [GitHub Releases](https://github.com/Shallow-dusty/Quota-Nexus/releases/latest) 下载
 `Quota-Nexus_*_Windows_x64_Installer_UNSIGNED.exe`，并用同一 Release 中的
 `checksums.txt` 核对 SHA-256。
