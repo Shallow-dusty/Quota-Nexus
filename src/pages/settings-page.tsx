@@ -370,7 +370,9 @@ function NetworkProfilesEditor({
     if (!selected) return;
     setSelectedId(selected.id);
     setLabel(selected.label);
-    setProxyUrl(selected.endpointLabel.replace(" · ", "://"));
+    // 用后端下发的结构化 proxyUrl 回填，不再从展示字符串反推
+    // （endpoint_label 是给人看的，格式演进不该污染可编辑值）。
+    setProxyUrl(selected.proxyUrl);
     setUsername("");
     setPassword("");
     setClearAuth(false);
@@ -579,9 +581,14 @@ function ThresholdField({
           max={100}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={() => {
+            // 空串 Number() 得 0 且 isFinite——曾被当成合法值提交，
+            // 把阈值清空会存 0 并让全部账号落入告警档。空/非法一律回退原值。
             const parsed = Number(draft);
-            if (Number.isFinite(parsed)) onCommit(parsed);
-            else setDraft(String(value));
+            if (draft.trim() === "" || !Number.isFinite(parsed)) {
+              setDraft(String(value));
+              return;
+            }
+            onCommit(Math.min(100, Math.max(0, parsed)));
           }}
           onKeyDown={(event) => {
             if (event.key === "Enter") event.currentTarget.blur();

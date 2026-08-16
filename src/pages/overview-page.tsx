@@ -184,9 +184,16 @@ export function OverviewPage({
 
       <div className="page-scroll overview-page flex-1 overflow-y-auto px-7 py-5">
         {loadError && (
-          <GlassSurface radius={16} className="mb-4 px-4 py-3">
-            <p className="text-[12.5px] text-ink-2">额度数据读取失败</p>
-            <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
+          <GlassSurface radius={16} className="mb-4 px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[12.5px] text-ink-2">额度数据读取失败</p>
+              <p className="mt-0.5 text-[11px] text-ink-3">{loadError}</p>
+            </div>
+            {accounts === null && (
+              <Button className="btn btn-outline shrink-0" onPress={() => void reload()}>
+                重试
+              </Button>
+            )}
           </GlassSurface>
         )}
         {accounts && accounts.length > 0 && (

@@ -101,6 +101,8 @@ export interface NetworkProfileView {
   id: string;
   label: string;
   endpointLabel: string;
+  /** 可编辑回填用的结构化代理 URL（scheme://host:port） */
+  proxyUrl: string;
   hasAuth: boolean;
 }
 

@@ -3,8 +3,8 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 文档状态 | Implemented baseline |
-| 版本 | 0.1.13 |
-| 最后更新 | 2026-08-11 |
+| 版本 | 0.1.14 |
+| 最后更新 | 2026-08-16 |
 | 首要平台 | Windows 11 |
 | 产品形态 | 本地桌面应用 |
 
@@ -51,8 +51,9 @@ Quota Nexus 把 OpenCode Go、Ollama Cloud 和 ClinePass 的多个账号放进�
 
 - Tauri 2 + Windows WebView2 + NSIS。
 - Rust、reqwest、sqlx/SQLite、keyring、Tauri plugins。
-- React 19、TypeScript、Vite、Tailwind CSS 4、React Aria、Lucide。
-- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 约 90KB gzip（v0.1.11，达成 120KB 目标）。
+- React 19、TypeScript、Vite、Tailwind CSS 4、Lucide（react-aria-components 已于
+  v0.1.11 移除，UI 原语自实现）。
+- SVG 自绘趋势图，不引入大型图表运行时；生产 JS 约 90KB gzip（v0.1.14 实测）。
 - Windows Credential Manager 保存 Provider 秘密和代理认证。
 
 前端没有第二个调度器。页面只读取 Rust Core DTO，并监听 `overview-updated` 事件；领域
@@ -145,7 +146,10 @@ SQLite 每次连接启用 `foreign_keys=ON`、WAL 和 5 秒 busy timeout。刷�
 - 401/403：认证暂停，直到更新凭据。
 - 429：优先 `Retry-After`，否则至少 5 分钟。
 - parser/schema 错误：Provider 级熔断 30 分钟，避免同一失效解析器逐账号重复请求。
-- 手动刷新可绕过普通网络/429 退避一次，不绕过认证暂停或 parser 熔断。
+- 手动刷新可绕过普通网络/429 退避一次，不绕过认证暂停；parser 熔断可被手动刷新提前
+  触发一次半开探测（有意设计：让用户在修复解析条件后立即验证，而非干等 30 分钟）。
+- 并发上限是全局的：调度器 tick 与用户手动刷新共享同一组 Provider 信号量，且同一账号
+  有 in-flight 去重——并发告警评估会读到相同旧状态导致双发通知，必须在入口互斥。
 - 系统休眠后，调度循环恢复时立即处理数据库中已经到期的任务。
 
 一家 Provider 的任务、并发信号量、错误状态和熔断均独立，不阻塞另外两家。
@@ -219,14 +223,28 @@ UI 使用 Windows 桌面语境下的克制液态玻璃，而不是复刻 macOS �
 无边框窗口教训（v0.1.11 修复）：Tauri 的 window 插件命令（minimize/close/toggleMaximize/
 start_dragging 等）不在 `core:default` 内，必须在 capabilities 显式授予 `window:allow-*`，
 否则窗口控制与拖拽被 ACL 静默拒绝；前端对这类调用不得静默 catch。
-材质引擎（v0.1.10 起）：折射位移剖面取凸 squircle 帽高度函数的导数（物理透镜近似）；
-色散为 R/B 通道 ±9% 的分通道位移，只在边缘位移区出现；高光为锐利 rim + 入射光带双层，
-随法线朝向变化；CSS 层以顶部光带、底部内阴影和环境投影表达玻璃厚度；数据卡中心 blur 7px
-保证文字可读。位移图与高光图按参数全键跨元素缓存（LRU），同尺寸表面共享地图。
-暗色主题教训（v0.1.12–13）：`saturate()` 在暗色上会放大背景色团与色散边（读作污渍）；
-SVG 折射链在低亮度背景上必然放大背景结构（底板 1.8 倍饱和预烘 + 位移折带），消融验证后
-暗色 GlassSurface 改走纯模糊路径，立体感由 CSS rim/阴影层承担；暗色阴影池必须克制，
-否则被邻近卡片的背景模糊采样进去。带 `!important` 的浅色硬编码规则必须有同级暗色覆盖。
+材质引擎（v0.1.10 起；v0.1.14 全面检修）：折射位移剖面取凸 squircle 帽高度函数的导数
+（物理透镜近似）；色散为 R/B 通道 ±9% 的分通道位移，只在边缘位移区出现；高光为锐利
+rim + 入射光带双层，随法线朝向变化；CSS 层以顶部光带、底部内阴影和环境投影表达玻璃
+厚度。位移图与高光图按参数全键跨元素缓存（LRU），同尺寸表面共享地图。v0.1.14 检修
+了三个让折射长期未真正生效的问题：其一，`.quota-card`/`.app-sidebar` 曾以带
+`!important` 的 `backdrop-filter` 压过 GlassSurface 的内联折射链（author `!important`
+高于内联样式），折射只出现在次要表面——现由组件内联统一管理，CSS 不再声明；其二，
+`.workspace-stage` 自带 backdrop-filter 会成为后代玻璃的 backdrop root，卡片采不到
+窗口极光背景——现撤除，全窗口只保留一层玻璃；其三，SVG filter 区域单位默认
+`objectBoundingBox` 会把像素值读成边界框倍数——现显式 `filterUnits=userSpaceOnUse`。
+带 `!important` 的浅色硬编码规则必须有同级暗色覆盖。
+暗色主题（v0.1.14 起）：v0.1.12–13 曾让暗色走纯模糊路径（saturate 预烘放大背景成
+"污渍"）；预烘源（工作台/侧栏 saturate 1.8 底板滤镜）撤除后，暗色改为弱折射——位移
+减半（maxDisp 9）、色散关闭、高光收敛，保留克制的透镜边。CSS rim/阴影层继续承担主
+立体感；暗色阴影池保持克制，否则被邻近卡片的背景模糊采样进去。
+液态交互与轮廓（v0.1.14 起）：`feDisplacementMap` 的 scale 是唯一无需重建位移图即可
+更新的参数，额度卡在悬停（×1.14）/按压（×0.74）时以 rAF 插值过渡折射强度，形成
+"液态"受压形变；`prefers-reduced-motion` 下直接跳变。主要矩形表面启用
+`corner-shape: squircle`（Chrome 139+），轮廓曲率与位移图的 squircle 剖面对齐，
+不支持的引擎安全回退圆角。页头为渐进模糊（顶部 22px 全强度、向下 mask 渐隐，
+iOS 26 工具栏式），本体不挂 backdrop-filter 以免成为后代 backdrop root。玻璃滤镜
+按视口懒挂（IntersectionObserver +120px 预载），滚动出视口的表面退回纯模糊。
 
 窗口壳层（v0.1.8 起）为无边框透明窗口：`decorations: false` + `transparent: true`，
 移除 Windows 原生标题栏。窗口控制（v0.1.9 起）为右上角标准三键：最小化/最大化/关闭，
@@ -265,6 +283,8 @@ SVG 折射链在低亮度背景上必然放大背景结构（底板 1.8 倍饱�
 ### 10.2 安全
 
 - [x] 上游固定 HTTPS host/path，禁用 cookie jar、自动重定向和环境/系统代理发现。
+- [x] WebView CSP 收紧为 `default-src 'self'`（v0.1.14；style 'unsafe-inline' 供内联样式，
+      img/font data: 供图标字体，IPC 源由 Tauri 注入）。
 - [x] Provider 秘密和代理认证只在 WCM，SQLite schema 无秘密列。
 - [x] 错误采用固定摘要，不输出代理端点、认证或底层请求正文。
 - [x] WCM 写入/读取/删除、代理不回退和 allowlist 有自动测试。
@@ -286,12 +306,12 @@ SVG 折射链在低亮度背景上必然放大背景结构（底板 1.8 倍饱�
 
 | 检查 | 结果 |
 | --- | --- |
-| `pnpm test` | 8/8（2026-08-11 复验；新增风险排序语义用例） |
-| `cargo test --lib` | 33 通过、5 忽略（2026-08-11 复验）；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
-| `cargo clippy --all-targets -- -D warnings` | 通过 |
-| `pnpm build` | 通过，JS 约 90KB gzip（2026-08-11 实测，达成 120KB 目标） |
-| `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过（2026-08-11 复验） |
-| 真实本机数据 | 已安装实例（v0.1.10）完成 schema 6 迁移，5 账号在库并真实刷新；OpenCode 百分比误读修复经生产数据验证（Yunara 周额度 100%→2%）（2026-08-11 复核） |
+| `pnpm test` | 8/8（2026-08-16 复验） |
+| `cargo test --lib` | 35 通过、5 忽略（2026-08-16 复验；新增标签编辑不重置调度、历史按账号过滤两个用例）；另有 2 个 WCM round-trip 通过，3 个真实 Provider live test 按需运行 |
+| `cargo clippy --all-targets -- -D warnings` | 通过（2026-08-16） |
+| `pnpm build` | 通过，JS 约 90.9KB gzip（主包 89.8KB，2026-08-16 实测，达成 120KB 目标） |
+| `pnpm visual:check` | 15 个视觉场景 + 50 账号场景通过（2026-08-16 复验） |
+| 折射生效验证 | computed `backdrop-filter` 含 `url(#qn-glass-*)`（卡片/侧栏，明暗双主题）、stage 无嵌套滤镜、`filterUnits=userSpaceOnUse`、`corner-shape: squircle`、暗色位移 scale=9（2026-08-16） |
 
 ## 11. 后续演进
 
@@ -301,6 +321,5 @@ SVG 折射链在低亮度背景上必然放大背景结构（底板 1.8 倍饱�
 - 账号操作、客户端联动和更细的通知规则。
 - 模型请求代理/路由或使用分析；若处理请求内容，需单独设计权限、保留与清理策略。
 - Linux/macOS 适配、公开签名发布和自动更新服务。
-- 前端 bundle 瘦身已完成（v0.1.11，约 90KB gzip）：移除 react-aria-components。
 
 新增能力不能把估算值冒充供应商真实额度，也不能绕过当前 Provider 请求作用域。

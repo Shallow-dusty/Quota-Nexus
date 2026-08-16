@@ -16,9 +16,10 @@ export function AccountTrend({ accountId }: { accountId: string }) {
     setPoints(null);
     setError(null);
     void quotaClient
-      .getHistory(days)
+      .getHistory(days, accountId)
       .then((data) => {
         if (!active) return;
+        // 后端已按账号过滤；这里再防御一次，确保趋势只含当前账号
         setPoints(data.filter((point) => point.accountId === accountId));
       })
       .catch((reason) => active && setError(commandErrorMessage(reason)));

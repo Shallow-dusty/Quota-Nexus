@@ -80,7 +80,7 @@ export interface QuotaClient {
   getSettings(): Promise<AppSettingsView>;
   updateSettings(input: AppSettingsView): Promise<AppSettingsView>;
   getProviderHealth(): Promise<import("./quota-types").ProviderHealthView[]>;
-  getHistory(days: 7 | 30 | 90): Promise<HistoryPointView[]>;
+  getHistory(days: 7 | 30 | 90, accountId?: string): Promise<HistoryPointView[]>;
   exportLatestSnapshot(): Promise<string>;
   getDiagnosticManifest(): Promise<string[]>;
   exportDiagnostics(): Promise<string>;
@@ -176,7 +176,7 @@ class Phase0FixtureClient implements QuotaClient {
     return structuredClone(phase0ProviderHealth);
   }
 
-  async getHistory(_days: 7 | 30 | 90): Promise<HistoryPointView[]> {
+  async getHistory(_days: 7 | 30 | 90, _accountId?: string): Promise<HistoryPointView[]> {
     return phase0Overview.accounts.flatMap((account) =>
       account.windows.flatMap((window) =>
         Array.from({ length: 7 }, (_, index) => ({
@@ -311,8 +311,8 @@ class TauriQuotaClient implements QuotaClient {
     return invoke("get_provider_health");
   }
 
-  getHistory(days: 7 | 30 | 90): Promise<HistoryPointView[]> {
-    return invoke("get_history", { days });
+  getHistory(days: 7 | 30 | 90, accountId?: string): Promise<HistoryPointView[]> {
+    return invoke("get_history", { days, accountId });
   }
 
   exportLatestSnapshot(): Promise<string> {

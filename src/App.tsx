@@ -1,13 +1,43 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "./components/shell/app-shell";
-import { ToastProvider } from "./components/ui/toast";
+import { ToastProvider, useToast } from "./components/ui/toast";
 import { ThresholdsProvider } from "./lib/thresholds";
 import { AccountsPage } from "./pages/accounts-page";
 import { OverviewPage } from "./pages/overview-page";
 import { SettingsPage } from "./pages/settings-page";
 import type { PageId } from "./lib/quota-types";
 import { useThemePreference } from "./lib/theme";
-import { quotaClient } from "./lib/quota-client";
+import { isTauriRuntime, quotaClient } from "./lib/quota-client";
+
+/**
+ * 调度器错误此前只 emit 无人收，后台刷新故障静默丢失。
+ * 在 ToastProvider 内订阅，转换为可见反馈。
+ */
+function SchedulerErrorWatcher() {
+  const toast = useToast();
+  useEffect(() => {
+    if (!isTauriRuntime) return;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void listen<{ message?: string }>("scheduler-error", (event) => {
+      toast.error(
+        "后台刷新异常",
+        event.payload?.message ?? "调度器执行失败，将在下个周期重试",
+      );
+    })
+      .then((dispose) => {
+        if (active) unlisten = dispose;
+        else dispose();
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [toast]);
+  return null;
+}
 
 export function App() {
   const [page, setPage] = useState<PageId>("overview");
@@ -52,6 +82,7 @@ export function App() {
 
   return (
     <ToastProvider>
+      <SchedulerErrorWatcher />
       <ThresholdsProvider>
         <AppShell
         page={page}

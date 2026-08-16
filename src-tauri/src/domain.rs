@@ -158,6 +158,8 @@ pub struct NetworkProfileView {
     pub id: String,
     pub label: String,
     pub endpoint_label: String,
+    /// 可编辑回填用的结构化代理 URL（scheme://host:port）；endpoint_label 仅用于展示。
+    pub proxy_url: String,
     pub has_auth: bool,
 }
 

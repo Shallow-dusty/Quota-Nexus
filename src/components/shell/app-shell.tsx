@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Cable,
   LayoutDashboard,
@@ -16,13 +17,14 @@ import { GlassSurface } from "../ui/glass";
 
 const handleWindowAction = (action: "close" | "minimize" | "maximize") => {
   if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
-  void (async () => {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  try {
     const win = getCurrentWindow();
-    if (action === "close") await win.close();
-    else if (action === "minimize") await win.minimize();
-    else await win.toggleMaximize();
-  })().catch((err) => console.warn("window action failed:", action, err));
+    if (action === "close") void win.close();
+    else if (action === "minimize") void win.minimize();
+    else void win.toggleMaximize();
+  } catch (err) {
+    console.warn("window action failed:", action, err);
+  }
 };
 
 const NAV: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> =
@@ -52,7 +54,7 @@ export function AppShell({
       <GlassSurface
         as="nav"
         radius={24}
-        blur={8}
+        blur={32}
         className={`app-sidebar shrink-0 flex flex-col transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
           collapsed ? "w-16" : "w-56"
         }`}

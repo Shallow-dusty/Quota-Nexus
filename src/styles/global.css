@@ -313,6 +313,7 @@ body {
 
 .app-sidebar {
   overflow: hidden;
+  corner-shape: squircle;
   border-radius: 28px !important;
   border: 1.5px solid rgba(255, 255, 255, 0.90) !important;
   background: rgba(255, 255, 255, 0.42) !important;
@@ -320,8 +321,8 @@ body {
     inset 0 2px 2.5px 0 #ffffff,
     inset 2.5px 0 2.5px 0 rgba(255, 255, 255, 0.90),
     0 24px 60px -12px rgba(50, 90, 160, 0.12) !important;
-  backdrop-filter: blur(32px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(1.8) !important;
+  /* backdrop-filter 由 GlassSurface 内联管理（折射链）；
+     这里不再声明，否则 !important 会压过内联折射。 */
 }
 
 .app-sidebar > * {
@@ -344,6 +345,7 @@ body {
 .workspace-stage {
   position: relative;
   overflow: hidden;
+  corner-shape: squircle;
   border-radius: 28px !important;
   border: 1.5px solid rgba(255, 255, 255, 0.90) !important;
   background: rgba(255, 255, 255, 0.38) !important;
@@ -351,8 +353,9 @@ body {
     inset 0 2px 2.5px 0 #ffffff,
     inset 2.5px 0 2.5px 0 rgba(255, 255, 255, 0.90),
     0 24px 60px -12px rgba(50, 90, 160, 0.12) !important;
-  backdrop-filter: blur(32px) saturate(1.8);
-  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  /* 不挂 backdrop-filter：带 backdrop-filter 的祖先会成为 backdrop root，
+     后代玻璃（卡片/浮层）将采不到窗口极光背景，只剩"无物可折"的半透明白底。
+     全窗口只保留一层玻璃——玻璃职能下放给卡片与控件。 */
 }
 
 .workspace-stage::before {
@@ -384,9 +387,22 @@ body {
   position: relative;
   z-index: 2;
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(250, 252, 251, 0.42);
-  backdrop-filter: blur(20px) saturate(1.05);
-  -webkit-backdrop-filter: blur(20px) saturate(1.05);
+  background: rgba(250, 252, 251, 0.26);
+  /* 本体不挂 backdrop-filter（避免成为后代玻璃的 backdrop root）；
+     渐进模糊由 ::before 承担：顶部全强度、向下渐隐——滚动内容从页头
+     下经过时呈现 iOS 26 工具栏式的"清晰渐入模糊"。 */
+}
+
+.page-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  backdrop-filter: blur(22px) saturate(1.08);
+  -webkit-backdrop-filter: blur(22px) saturate(1.08);
+  mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 96%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 96%);
 }
 
 .page-header::after {
@@ -408,6 +424,9 @@ body {
 .page-scroll {
   position: relative;
   z-index: 1;
+  /* 独立合成层：滚动内容成为稳定纹理，规避 Chromium 对
+     backdrop-filter: url() 的滚动闪动缺陷（crbug 41471914）。 */
+  transform: translateZ(0);
 }
 
 .data-provenance {
@@ -444,6 +463,9 @@ body {
   isolation: isolate;
   border: 1px solid var(--glass-outline);
   background: var(--glass-bg);
+  /* Chrome 139+：连续曲率轮廓（与位移图的 squircle 剖面对齐）；
+     不支持的引擎安全忽略，保持圆角。 */
+  corner-shape: squircle;
   box-shadow: var(--glass-shadow), var(--glass-edge);
   transition:
     background-color var(--dur-med) var(--ease),
@@ -938,6 +960,7 @@ body {
 
 .quota-card {
   min-height: 312px;
+  corner-shape: squircle;
   border-radius: 28px !important;
   border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
   background:
@@ -950,8 +973,8 @@ body {
     inset -2px -2px 4px 0 rgba(0, 0, 0, 0.03),
     0 24px 60px -10px rgba(50, 90, 160, 0.14),
     0 6px 18px -2px rgba(0, 0, 0, 0.05) !important;
-  backdrop-filter: blur(32px) saturate(2.0) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(2.0) !important;
+  /* backdrop-filter 由 GlassSurface 内联折射链管理，此处声明会被 !important
+     提升而压掉折射（v0.1.5–v0.1.13 折射从未在卡片上生效的根因）。 */
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -1208,7 +1231,9 @@ body {
 }
 
 .quota-thresholds {
-  display: none;
+  position: absolute;
+  inset: 1.5px;
+  pointer-events: none;
 }
 
 .quota-thresholds i {
@@ -1496,6 +1521,14 @@ input:checked ~ .toggle-thumb {
     background: var(--stage-solid);
   }
 
+  .page-header {
+    background: var(--stage-solid);
+  }
+
+  .page-header::before {
+    display: none;
+  }
+
   .app-sidebar::before,
   .surface-floating::before,
   .workspace-stage::after,
@@ -1523,6 +1556,14 @@ input:checked ~ .toggle-thumb {
 
 :root[data-transparency="off"] .workspace-stage {
   background: var(--stage-solid);
+}
+
+:root[data-transparency="off"] .page-header {
+  background: var(--stage-solid);
+}
+
+:root[data-transparency="off"] .page-header::before {
+  display: none;
 }
 
 :root[data-transparency="off"] .app-sidebar::before,
@@ -1777,17 +1818,4 @@ input:checked ~ .toggle-thumb {
 :root[data-theme="dark"] .quota-card::before,
 :root[data-theme="dark"] .quota-card::after {
   opacity: 0.35;
-}
-
-/* 暗色下卡面背景饱和收敛（saturate(2.0) 会把极光染成色斑） */
-:root[data-theme="dark"] .quota-card {
-  backdrop-filter: blur(32px) saturate(1.05) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(1.05) !important;
-}
-
-/* 同理收敛侧栏与工作台底板：它们的 1.8 倍饱和会把色斑“预烘”进所有卡片的背景 */
-:root[data-theme="dark"] .app-sidebar,
-:root[data-theme="dark"] .workspace-stage {
-  backdrop-filter: blur(32px) saturate(1.15) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(1.15) !important;
 }

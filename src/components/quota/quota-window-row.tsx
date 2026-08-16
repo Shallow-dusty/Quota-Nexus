@@ -4,12 +4,12 @@ import { formatPercent, formatResetCountdown } from "../../lib/format";
 import { clampPercent, remainingPercent } from "../../lib/quota-logic";
 import type { QuotaWindowView, WindowTone } from "../../lib/quota-types";
 
-/** 数字即状态：非常态档位直接把关键数字染成档位色 */
+/** 数字即状态：非常态档位直接把关键数字染成档位色（跟随主题的档位填充色） */
 const TONE_COLOR: Record<WindowTone, string> = {
   normal: "var(--ink-1)",
-  warning: "#f97316",
-  high: "#f97316",
-  critical: "#f43f5e",
+  warning: "var(--fill-warn)",
+  high: "var(--fill-high)",
+  critical: "var(--fill-crit)",
 };
 
 export function QuotaWindowRow({

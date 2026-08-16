@@ -1,7 +1,7 @@
 {
   "name": "quota-nexus",
   "private": true,
-  "version": "0.1.13",
+  "version": "0.1.14",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -17,7 +17,6 @@
     "@tauri-apps/api": "^2.11.1",
     "lucide-react": "1.28.0",
     "react": "19.2.8",
-    "react-aria-components": "1.19.0",
     "react-dom": "19.2.8"
   },
   "devDependencies": {

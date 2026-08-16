@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.1.14 — 2026-08-16
+
+深度审计修复：让液态玻璃折射首次真正上卡；并发与数据正确性治理。
+
+### 液态玻璃（折射引擎全面检修）
+
+- **折射真正上卡（关键修复）**：`.quota-card`/`.app-sidebar` 曾以带 `!important` 的
+  `backdrop-filter` 压过 GlassSurface 的内联折射链（author `!important` 高于内联样式），
+  v0.1.5–v0.1.13 期间整套 SVG 折射引擎从未在卡片与侧栏上生效。现由组件内联统一管理。
+- **撤除嵌套玻璃**：`.workspace-stage` 的 backdrop-filter 会让它成为后代玻璃的
+  backdrop root，卡片只能采样到半透明白底而采不到窗口极光。现撤除，全窗口单层玻璃。
+- **filterUnits 修复**：SVG filter 显式 `userSpaceOnUse`——默认 `objectBoundingBox`
+  会把像素值解析为边界框倍数，产生数百倍于元素的 filter 区域（GPU 纹理浪费）。
+- **squircle 轮廓**：主要矩形表面启用 `corner-shape: squircle`（Chrome 139+），
+  轮廓曲率与位移图的 squircle 剖面对齐；不支持引擎安全回退圆角。
+- **液态交互**：额度卡悬停（×1.14）/按压（×0.74）时以 rAF 插值过渡折射强度——
+  `feDisplacementMap` 的 scale 是唯一无需重建位移图即可动画的参数；
+  reduced-motion 下直接跳变。
+- **渐进模糊页头**：页头改为顶部 22px 全强度、向下 mask 渐隐（iOS 26 工具栏式），
+  本体不挂 backdrop-filter 以免成为后代 backdrop root。
+- **暗色弱折射**：v0.1.13 的"暗色纯模糊"根因是底板饱和预烘；预烘撤除后暗色改为
+  位移减半（scale 9）、色散关闭、高光收敛的克制透镜边。
+- **视口懒挂**：滚动出视口（+120px 预载带）的表面退回纯模糊，进入视口再挂折射链；
+  `.page-scroll` 提升为独立合成层，规避 Chromium 对 `backdrop-filter: url()`
+  的滚动闪动缺陷（crbug 41471914）。
+
+### 数据正确性与并发
+
+- **阈值输入修复（P0）**：阈值输入框清空后失焦曾被存为 0（`Number("") === 0` 且
+  isFinite），导致全部账号落入 Warning 档并触发通知风暴。空/非法输入现回退原值，
+  提交值 clamp 到 0–100。
+- **同账号 in-flight 去重 + 全局并发**：调度器与手动刷新并发时同一账号会被同时抓取，
+  并发的告警评估读到相同旧状态导致双发通知；Provider 信号量也在每次刷新时重建，
+  使实际上限翻倍。现改为全局静态信号量 + in-flight 集合互斥。
+- **编辑标签不再重置刷新计划**：改标签会把 `next_refresh_at` 重置为 now 触发即时刷新；
+  现仅在恢复暂停账号且计划为空时补 now。
+- **get_history 按账号过滤**：趋势图所需单账号序列不再整表跨 IPC 后前端过滤。
+- **Ollama Bearer 剥离修正**：含 `=` 的 base64 API Key 不再被误判为 Cookie 而跳过
+  Bearer 前缀剥离。
+
+### 其他修复与优化
+
+- 导出文件名带毫秒（同秒连续导出不覆盖）；ZIP 打包移入 blocking 线程池，
+  快照写盘改异步。
+- overview/connections 消除 N+1（窗口快照与凭据计数各一次聚合查询）。
+- OpenCode 多 Workspace 并行抓取（保序 buffered，并发 2），超时不再叠加。
+- WebView 配置 CSP（default-src 'self'）。
+- 前端订阅 `scheduler-error` 事件（此前只发不收，调度故障静默丢失）。
+- 固定出口编辑改用结构化 `proxyUrl` 回填，不再从展示字符串反推。
+- 阈值刻度恢复显示；SegmentedControl 方向键导航 + roving tabindex；
+  概览初始加载失败提供重试；窗口档位色改用主题变量（暗色适配）；
+  共享时钟替代每卡定时器；移除已无引用的 react-aria-components 依赖；
+  index.html 元数据更名 Quota Nexus。
+
 ## v0.1.13 — 2026-08-11
 
 深色模式观感打磨：卡片不再像“充气垫”，玻璃污渍彻底清除。

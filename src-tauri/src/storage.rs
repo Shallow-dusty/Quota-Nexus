@@ -1,5 +1,5 @@
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
     path::Path,
     time::Duration,
@@ -41,14 +41,6 @@ struct AccountRow {
     consecutive_failures: i64,
     auth_paused: bool,
     effective_refresh_minutes: Option<i64>,
-}
-
-#[derive(Debug, FromRow)]
-struct WindowRow {
-    window_kind: String,
-    window_label: String,
-    used_percent: f64,
-    resets_at: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -591,44 +583,56 @@ async fn account_rows(pool: &SqlitePool) -> Result<Vec<AccountRow>, CommandError
     .map_err(|_| CommandError::storage("无法读取本地账号"))
 }
 
-async fn windows_for(
+#[derive(Debug, FromRow)]
+struct AllWindowRow {
+    account_id: String,
+    window_kind: String,
+    window_label: String,
+    used_percent: f64,
+    resets_at: Option<String>,
+}
+
+/// 一次性读取全部账号的窗口快照并按账号分组（替代逐账号查询的 N+1）。
+async fn all_windows_by_account(
     pool: &SqlitePool,
-    account_id: &str,
-) -> Result<Vec<QuotaWindowView>, CommandError> {
-    let rows = sqlx::query_as::<_, WindowRow>(
-        "SELECT window_kind, window_label, used_percent, resets_at
+) -> Result<HashMap<String, Vec<QuotaWindowView>>, CommandError> {
+    let rows = sqlx::query_as::<_, AllWindowRow>(
+        "SELECT account_id, window_kind, window_label, used_percent, resets_at
          FROM quota_snapshots
-         WHERE account_id = ?
-         ORDER BY CASE window_kind
-           WHEN 'rolling_5h' THEN 1 WHEN 'session' THEN 2
-           WHEN 'weekly' THEN 3 WHEN 'monthly' THEN 4 ELSE 5 END",
+         ORDER BY account_id,
+           CASE window_kind
+             WHEN 'rolling_5h' THEN 1 WHEN 'session' THEN 2
+             WHEN 'weekly' THEN 3 WHEN 'monthly' THEN 4 ELSE 5 END",
     )
-    .bind(account_id)
     .fetch_all(pool)
     .await
     .map_err(|_| CommandError::storage("无法读取额度快照"))?;
-    Ok(rows
-        .into_iter()
-        .map(|row| QuotaWindowView {
+    let mut grouped: HashMap<String, Vec<QuotaWindowView>> = HashMap::new();
+    for row in rows {
+        grouped.entry(row.account_id).or_default().push(QuotaWindowView {
             id: row.window_kind.clone(),
             kind: row.window_kind,
             label: row.window_label,
             used_percent: row.used_percent,
             resets_at: row.resets_at,
-        })
-        .collect())
+        });
+    }
+    Ok(grouped)
 }
 
 pub async fn overview(pool: &SqlitePool) -> Result<OverviewView, CommandError> {
     let rows = account_rows(pool).await?;
     let app_settings = settings(pool).await?;
+    let windows_by_account = all_windows_by_account(pool).await?;
     let mut accounts = Vec::with_capacity(rows.len());
     let mut refreshed_at: Option<String> = None;
     for row in rows {
-        let windows = windows_for(pool, &row.id)
-            .await?
-            .into_iter()
-            .map(|window| TonedQuotaWindow::from_window(window, &app_settings))
+        let windows = windows_by_account
+            .get(&row.id)
+            .map(|windows| windows.as_slice())
+            .unwrap_or_default()
+            .iter()
+            .map(|window| TonedQuotaWindow::from_window(window.clone(), &app_settings))
             .collect();
         if row.last_success_at > refreshed_at {
             refreshed_at = row.last_success_at.clone();
@@ -663,14 +667,19 @@ pub async fn overview(pool: &SqlitePool) -> Result<OverviewView, CommandError> {
 
 pub async fn connections(pool: &SqlitePool) -> Result<Vec<AccountConnectionView>, CommandError> {
     let rows = account_rows(pool).await?;
+    let mut shared_counts: HashMap<String, i64> = HashMap::new();
+    for (credential_id, count) in sqlx::query_as::<_, (String, i64)>(
+        "SELECT credential_id, COUNT(*) FROM provider_accounts GROUP BY credential_id",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|_| CommandError::storage("无法读取凭据引用数"))?
+    {
+        shared_counts.insert(credential_id, count);
+    }
     let mut output = Vec::with_capacity(rows.len());
     for row in rows {
-        let shared_account_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM provider_accounts WHERE credential_id = ?")
-                .bind(&row.credential_id)
-                .fetch_one(pool)
-                .await
-                .map_err(|_| CommandError::storage("无法读取凭据引用数"))?;
+        let shared_account_count = shared_counts.get(&row.credential_id).copied().unwrap_or(0);
         let stale = row.last_error_category.is_some();
         output.push(AccountConnectionView {
             id: row.id,
@@ -796,6 +805,7 @@ pub async fn network_profiles(pool: &SqlitePool) -> Result<Vec<NetworkProfileVie
             id: row.id,
             label: row.label,
             endpoint_label: format!("{} · {}:{}", row.transport, row.host, row.port),
+            proxy_url: format!("{}://{}:{}", row.transport, row.host, row.port),
             has_auth: row.has_auth,
         })
         .collect())
@@ -956,10 +966,12 @@ pub async fn update_account(
 ) -> Result<(), CommandError> {
     let now = Utc::now().to_rfc3339();
     let result = sqlx::query(
+        // 编辑标签/开关不重置既有刷新计划：恢复（enabled 0→1）时若计划为空才补 now，
+        // 暂停则清空计划。否则改个标签就会触发一次即时刷新。
         "UPDATE provider_accounts
          SET label = ?, enabled = ?,
              next_refresh_at = CASE
-               WHEN ? = 1 AND auth_paused = 0 THEN ?
+               WHEN ? = 1 THEN COALESCE(next_refresh_at, ?)
                ELSE NULL
              END,
              updated_at = ?
@@ -1202,7 +1214,11 @@ pub async fn provider_health(pool: &SqlitePool) -> Result<Vec<ProviderHealthView
         .collect())
 }
 
-pub async fn history(pool: &SqlitePool, days: i64) -> Result<Vec<HistoryPointView>, CommandError> {
+pub async fn history(
+    pool: &SqlitePool,
+    days: i64,
+    account_id: Option<&str>,
+) -> Result<Vec<HistoryPointView>, CommandError> {
     if !matches!(days, 7 | 30 | 90) {
         return Err(CommandError::validation("历史范围只能是 7、30 或 90 天"));
     }
@@ -1217,17 +1233,34 @@ pub async fn history(pool: &SqlitePool, days: i64) -> Result<Vec<HistoryPointVie
         observed_at: String,
     }
     let cutoff = (Utc::now() - ChronoDuration::days(days)).to_rfc3339();
-    let rows = sqlx::query_as::<_, Row>(
-        "SELECT h.account_id, a.provider, a.label AS account_label,
-                h.window_kind, h.window_label, h.used_percent, h.observed_at
-         FROM quota_history h
-         JOIN provider_accounts a ON a.id = h.account_id
-         WHERE h.observed_at >= ?
-         ORDER BY h.observed_at ASC",
-    )
-    .bind(cutoff)
-    .fetch_all(pool)
-    .await
+    // 按账号过滤：趋势图只需要单个账号的序列，不再整表跨 IPC 后前端过滤。
+    let account_id = account_id.map(str::trim).filter(|value| !value.is_empty());
+    let rows = if let Some(id) = account_id {
+        sqlx::query_as::<_, Row>(
+            "SELECT h.account_id, a.provider, a.label AS account_label,
+                    h.window_kind, h.window_label, h.used_percent, h.observed_at
+             FROM quota_history h
+             JOIN provider_accounts a ON a.id = h.account_id
+             WHERE h.observed_at >= ? AND h.account_id = ?
+             ORDER BY h.observed_at ASC",
+        )
+        .bind(cutoff)
+        .bind(id)
+        .fetch_all(pool)
+        .await
+    } else {
+        sqlx::query_as::<_, Row>(
+            "SELECT h.account_id, a.provider, a.label AS account_label,
+                    h.window_kind, h.window_label, h.used_percent, h.observed_at
+             FROM quota_history h
+             JOIN provider_accounts a ON a.id = h.account_id
+             WHERE h.observed_at >= ?
+             ORDER BY h.observed_at ASC",
+        )
+        .bind(cutoff)
+        .fetch_all(pool)
+        .await
+    }
     .map_err(|_| CommandError::storage("无法读取额度历史"))?;
     Ok(rows
         .into_iter()
@@ -2144,6 +2177,76 @@ mod tests {
             .await
             .unwrap()
             .is_empty());
+    }
+
+    #[tokio::test]
+    async fn editing_label_keeps_existing_refresh_schedule() {
+        let pool = seeded_pool("clinepass").await;
+        let future = (Utc::now() + ChronoDuration::hours(2)).to_rfc3339();
+        sqlx::query(
+            "UPDATE provider_accounts SET next_refresh_at = ? WHERE id = 'account-test'",
+        )
+        .bind(&future)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        update_account(&pool, "account-test", "新标签", true)
+            .await
+            .unwrap();
+        let schedule: Option<String> =
+            sqlx::query_scalar("SELECT next_refresh_at FROM provider_accounts WHERE id = ?")
+                .bind("account-test")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(schedule.as_deref(), Some(future.as_str()));
+
+        // 暂停清空计划；恢复时计划为空则立即安排
+        update_account(&pool, "account-test", "新标签", false)
+            .await
+            .unwrap();
+        let paused: Option<String> =
+            sqlx::query_scalar("SELECT next_refresh_at FROM provider_accounts WHERE id = ?")
+                .bind("account-test")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(paused.is_none());
+        update_account(&pool, "account-test", "新标签", true)
+            .await
+            .unwrap();
+        let resumed: Option<String> =
+            sqlx::query_scalar("SELECT next_refresh_at FROM provider_accounts WHERE id = ?")
+                .bind("account-test")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(resumed.is_some());
+    }
+
+    #[tokio::test]
+    async fn history_filters_by_account_when_requested() {
+        let pool = seeded_pool("opencode-go").await;
+        insert_accounts_for_credential(
+            &pool,
+            "credential-test",
+            "opencode-go",
+            &[NewAccountRecord {
+                id: "account-second".into(),
+                label: "第二工作区".into(),
+                scope_id: Some("workspace-b".into()),
+                plan: None,
+                windows: vec![quota_window(20.0)],
+            }],
+        )
+        .await
+        .unwrap();
+        let scoped = history(&pool, 7, Some("account-test")).await.unwrap();
+        assert!(!scoped.is_empty());
+        assert!(scoped.iter().all(|point| point.account_id == "account-test"));
+        let all = history(&pool, 7, None).await.unwrap();
+        assert!(all.len() > scoped.len());
     }
 
     #[tokio::test]

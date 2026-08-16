@@ -29,6 +29,8 @@ export function ServiceQuotaCard({
   return (
     <GlassSurface
       radius={28}
+      blur={32}
+      interactive
       className="quota-card p-5.5 flex flex-col gap-4"
       role="button"
       tabIndex={0}

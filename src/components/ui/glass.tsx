@@ -33,6 +33,8 @@ export interface GlassSurfaceProps<T extends ElementType = "div"> {
   /** backdrop frosted blur px */
   blur?: number;
   saturate?: number;
+  /** 悬停/按压时折射强度液态变化：位移 scale 是唯一无需重建地图即可动画的参数 */
+  interactive?: boolean;
   glass?: GlassOptions;
   className?: string;
   style?: CSSProperties;
@@ -71,6 +73,14 @@ function prefersPlain(): boolean {
   return false;
 }
 
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return true;
+  }
+}
+
 /** True when the expensive refraction filter should run. */
 export function glassEnabled(): boolean {
   return supportsBackdropUrl() && !prefersPlain();
@@ -97,22 +107,36 @@ function ensureDefs(): SVGDefsElement {
   return defsEl;
 }
 
-function sub(parent: Element, name: string, attrs: Record<string, string | number>): void {
+function sub(parent: Element, name: string, attrs: Record<string, string | number>): SVGElement {
   const el = document.createElementNS(SVGNS, name);
   for (const k in attrs) el.setAttribute(k, String(attrs[k]));
   parent.appendChild(el);
+  return el;
+}
+
+export interface GlassFilterHandle {
+  dispose: () => void;
+  /** 倍率 1 = 基准折射强度；不重建位移图即可更新（悬停/按压的"液态"过渡） */
+  setScale: (factor: number) => void;
 }
 
 function applyGlassFilter(
   el: HTMLElement,
   maps: ReturnType<typeof buildGlassMaps>,
-  { blur, saturate }: { blur: string; saturate: string },
-): () => void {
+  {
+    blur,
+    saturate,
+    dispersion,
+  }: { blur: string; saturate: string; dispersion: number },
+): GlassFilterHandle {
   const defs = ensureDefs();
   const id = `qn-glass-${++seq}`;
   const filter = document.createElementNS(SVGNS, "filter");
   filter.setAttribute("id", id);
+  filter.setAttribute("filterUnits", "userSpaceOnUse");
   filter.setAttribute("primitiveUnits", "userSpaceOnUse");
+  // filterUnits 必须显式声明：默认的 objectBoundingBox 会把下面这些像素值
+  // 解析成边界框倍数，产生数百倍于元素的 filter 区域（GPU 纹理浪费）。
   filter.setAttribute("x", "-20");
   filter.setAttribute("y", "-20");
   filter.setAttribute("width", String(maps.width + 40));
@@ -121,8 +145,8 @@ function applyGlassFilter(
   defs.appendChild(filter);
 
   // 1. Refraction with per-channel dispersion: R/B channels are displaced
-  // ±9% around G, so chromatic fringing appears only where displacement is
-  // non-zero (the bevelled edge) — physical, no artificial mask needed.
+  // ±dispersion around G, so chromatic fringing appears only where displacement
+  // is non-zero (the bevelled edge) — physical, no artificial mask needed.
   sub(filter, "feImage", {
     href: maps.dispUrl,
     x: 0,
@@ -132,17 +156,17 @@ function applyGlassFilter(
     preserveAspectRatio: "none",
     result: "dispmap",
   });
-  const dispStrong = (maps.maxDisp * 1.09).toFixed(2);
-  const dispWeak = (maps.maxDisp * 0.91).toFixed(2);
-  sub(filter, "feDisplacementMap", {
+  const strongScale = maps.maxDisp * (1 + dispersion);
+  const weakScale = maps.maxDisp * (1 - dispersion);
+  const dispR = sub(filter, "feDisplacementMap", {
     in: "SourceGraphic",
     in2: "dispmap",
-    scale: dispStrong,
+    scale: strongScale,
     xChannelSelector: "R",
     yChannelSelector: "G",
     result: "dispR",
   });
-  sub(filter, "feDisplacementMap", {
+  const dispG = sub(filter, "feDisplacementMap", {
     in: "SourceGraphic",
     in2: "dispmap",
     scale: maps.maxDisp,
@@ -150,10 +174,10 @@ function applyGlassFilter(
     yChannelSelector: "G",
     result: "dispG",
   });
-  sub(filter, "feDisplacementMap", {
+  const dispB = sub(filter, "feDisplacementMap", {
     in: "SourceGraphic",
     in2: "dispmap",
-    scale: dispWeak,
+    scale: weakScale,
     xChannelSelector: "R",
     yChannelSelector: "G",
     result: "dispB",
@@ -220,8 +244,15 @@ function applyGlassFilter(
   el.style.backdropFilter = chain;
   el.style.setProperty("-webkit-backdrop-filter", chain);
 
-  return () => {
-    filter.remove();
+  return {
+    setScale(factor: number) {
+      dispR.setAttribute("scale", (strongScale * factor).toFixed(2));
+      dispG.setAttribute("scale", (maps.maxDisp * factor).toFixed(2));
+      dispB.setAttribute("scale", (weakScale * factor).toFixed(2));
+    },
+    dispose() {
+      filter.remove();
+    },
   };
 }
 
@@ -256,6 +287,7 @@ export function GlassSurface<T extends ElementType = "div">({
   radius = 20,
   blur,
   saturate,
+  interactive = false,
   glass,
   className,
   style,
@@ -263,41 +295,111 @@ export function GlassSurface<T extends ElementType = "div">({
   ...props
 }: GlassSurfaceProps<T> & Omit<ComponentPropsWithoutRef<T>, keyof GlassSurfaceProps<T>>) {
   const ref = useRef<HTMLElement | null>(null);
-  // 未显式传参时走主题 token（--glass-blur/--glass-saturate，暗色主题更深更低保和）
+  // 未显式传参时走主题 token（--glass-blur/--glass-saturate）
   const blurCss = blur != null ? `${blur}px` : "var(--glass-blur)";
   const saturateCss = saturate != null ? String(saturate) : "var(--glass-saturate)";
-  // 暗色主题走纯模糊路径（见下方 effect），折射参数无需按主题区分
   const theme = useDocumentTheme();
+  // 视口懒挂：屏幕外的表面只保留轻量模糊，滚回视口再挂折射链（大量卡片时 GPU 减负）
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => setVisible(entries[entries.length - 1]?.isIntersecting ?? true),
+      { rootMargin: "120px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    // 暗色主题走纯模糊路径：SVG 折射链在低亮度背景上会把背景结构放大成“污渍”，
-    // 且暗色下透镜边几不可见——立体感由 CSS rim/阴影层承担。
-    if (!glassEnabled() || theme === "dark") {
+    if (!glassEnabled() || !visible) {
       applyPlain(el, { blur: blurCss, saturate: saturateCss });
       return;
     }
 
-    let dispose: () => void = () => {};
+    // 暗色走"弱折射"而不是纯模糊：v0.1.13 的污渍根因是底板饱和预烘
+    // （侧栏/工作台 saturate 1.8 会把极光放大成色斑），预烘撤除后保留
+    // 位移 halved、色散关闭、高光收敛的克制透镜边即可。
+    const dark = theme === "dark";
+    let handle: GlassFilterHandle | null = null;
     let raf = 0;
+    let scaleRaf = 0;
+    let currentFactor = 1;
+    let targetFactor = 1;
+    const reducedMotion = prefersReducedMotion();
+
     const regenerate = () => {
       const rect = el.getBoundingClientRect();
       const width = Math.round(rect.width);
       const height = Math.round(rect.height);
-      dispose();
-      dispose = () => {};
+      handle?.dispose();
+      handle = null;
       if (width < 3 || height < 3) return;
       const maps = buildGlassMaps({
         width,
         height,
         radius,
         resolution: 0.6,
+        ...(dark ? { maxDisp: 9, specStrength: 0.5, edgeAmbient: 0.22 } : {}),
         ...glass,
       });
-      dispose = applyGlassFilter(el, maps, { blur: blurCss, saturate: saturateCss });
+      handle = applyGlassFilter(el, maps, {
+        blur: blurCss,
+        saturate: saturateCss,
+        dispersion: dark ? 0 : 0.09,
+      });
+      currentFactor = 1;
+      targetFactor = 1;
     };
+
+    // 悬停/按压的液态折射过渡：rAF 向目标倍率插值（reduced-motion 直接跳变）
+    const applyScale = (factor: number) => {
+      currentFactor = factor;
+      handle?.setScale(factor);
+    };
+    const tick = () => {
+      if (Math.abs(targetFactor - currentFactor) < 0.004) {
+        applyScale(targetFactor);
+        scaleRaf = 0;
+        return;
+      }
+      applyScale(currentFactor + (targetFactor - currentFactor) * 0.22);
+      scaleRaf = requestAnimationFrame(tick);
+    };
+    const requestScale = (factor: number) => {
+      targetFactor = factor;
+      if (reducedMotion) {
+        cancelAnimationFrame(scaleRaf);
+        scaleRaf = 0;
+        applyScale(factor);
+        return;
+      }
+      if (!scaleRaf) scaleRaf = requestAnimationFrame(tick);
+    };
+
+    let detachPointer: (() => void) | undefined;
+    if (interactive) {
+      const onEnter = () => requestScale(1.14);
+      const onLeave = () => requestScale(1);
+      const onDown = () => requestScale(0.74);
+      const onUp = () => requestScale(1.14);
+      el.addEventListener("pointerenter", onEnter);
+      el.addEventListener("pointerleave", onLeave);
+      el.addEventListener("pointerdown", onDown);
+      el.addEventListener("pointerup", onUp);
+      detachPointer = () => {
+        el.removeEventListener("pointerenter", onEnter);
+        el.removeEventListener("pointerleave", onLeave);
+        el.removeEventListener("pointerdown", onDown);
+        el.removeEventListener("pointerup", onUp);
+      };
+    }
+
     const schedule = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(regenerate);
@@ -308,12 +410,14 @@ export function GlassSurface<T extends ElementType = "div">({
     ro.observe(el);
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(scaleRaf);
       ro.disconnect();
-      dispose();
+      detachPointer?.();
+      handle?.dispose();
     };
     // radius/blur/saturate/glass changes re-run via parent re-render + key usage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radius, blur, saturate, theme, JSON.stringify(glass ?? {})]);
+  }, [radius, blur, saturate, interactive, theme, visible, JSON.stringify(glass ?? {})]);
 
   const Component = (as ?? "div") as ElementType;
   return (

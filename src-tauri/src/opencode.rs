@@ -1,4 +1,5 @@
 use chrono::{Duration, Utc};
+use futures::{stream, StreamExt, TryStreamExt};
 use regex::Regex;
 use reqwest::{Client, StatusCode};
 use uuid::Uuid;
@@ -33,14 +34,22 @@ pub async fn fetch_accounts(
         }
         None => discover_workspaces(client, cookie).await?,
     };
-    let mut accounts = Vec::with_capacity(workspace_ids.len());
-    for workspace_id in workspace_ids {
-        let windows = fetch_workspace(client, cookie, &workspace_id).await?;
-        accounts.push(WorkspaceQuota {
-            workspace_id,
-            windows,
-        });
-    }
+    // 多 Workspace 并发抓取（保序 buffered，并发 2）：
+    // 串行循环会把每个页面的超时叠加到整个账号的刷新耗时上。
+    let accounts = stream::iter(workspace_ids)
+        .map(|workspace_id| {
+            let cookie = cookie.to_string();
+            async move {
+                let windows = fetch_workspace(client, &cookie, &workspace_id).await?;
+                Ok::<WorkspaceQuota, CommandError>(WorkspaceQuota {
+                    workspace_id,
+                    windows,
+                })
+            }
+        })
+        .buffered(2)
+        .try_collect()
+        .await?;
     Ok(accounts)
 }
 

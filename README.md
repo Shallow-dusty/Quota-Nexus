@@ -49,11 +49,11 @@ Ollama Cloud 和 ClinePass 账号聚合到同一套界面。当前版本聚焦�
 | 层 | 实现 |
 | --- | --- |
 | 桌面 | Tauri 2，Windows WebView2，NSIS 安装包 |
-| 前端 | React 19、TypeScript、Vite、Tailwind CSS 4、React Aria、Lucide |
+| 前端 | React 19、TypeScript、Vite、Tailwind CSS 4、Lucide |
 | 后端 | Rust、reqwest、sqlx/SQLite、Tauri plugins |
 | 凭据 | Windows Credential Manager |
 | 网络 | 默认普通 socket/TUN；可按 Credential 固定 HTTP(S)/SOCKS5(H) 出口 |
-| 视觉 | 稳定数据面 + 玻璃控制层/浮层；透明关闭和高对比模式完整回退 |
+| 视觉 | 液态玻璃（SVG 折射 + 分通道色散 + squircle 轮廓 + 渐进模糊）；透明关闭和高对比模式完整回退 |
 
 ## 开发与构建
 

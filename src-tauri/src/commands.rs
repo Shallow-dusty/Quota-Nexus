@@ -1,10 +1,10 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Write,
     path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex, OnceLock,
     },
 };
 
@@ -49,6 +49,40 @@ enum ProviderPayload {
     Cline(Vec<crate::domain::QuotaWindowView>),
     Ollama(ollama::OllamaQuota),
     OpenCode(Vec<opencode::WorkspaceQuota>),
+}
+
+/// 全局同 Provider 并发上限。放进静态而不是每次 refresh() 重建：
+/// 调度器 tick 与用户手动刷新并发时，局部信号量会让实际上限翻倍。
+static PROVIDER_SEMAPHORES: OnceLock<HashMap<String, Arc<Semaphore>>> = OnceLock::new();
+
+fn provider_semaphore(provider: &str) -> Arc<Semaphore> {
+    let map = PROVIDER_SEMAPHORES.get_or_init(|| {
+        HashMap::from([
+            ("clinepass".to_string(), Arc::new(Semaphore::new(2))),
+            ("opencode-go".to_string(), Arc::new(Semaphore::new(2))),
+            ("ollama-cloud".to_string(), Arc::new(Semaphore::new(2))),
+        ])
+    });
+    map.get(provider)
+        .cloned()
+        .unwrap_or_else(|| Arc::new(Semaphore::new(1)))
+}
+
+/// 正在刷新的账号集合：防止调度器与手动刷新同时抓同一账号
+/// （并发告警评估会读到相同旧状态，导致同一告警双发通知）。
+static IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+fn try_mark_in_flight(account_id: &str) -> bool {
+    let set = IN_FLIGHT.get_or_init(|| Mutex::new(HashSet::new()));
+    set.lock()
+        .map(|mut guard| guard.insert(account_id.to_string()))
+        .unwrap_or(true)
+}
+
+fn clear_in_flight(account_id: &str) {
+    if let Some(set) = IN_FLIGHT.get() {
+        let _ = set.lock().map(|mut guard| guard.remove(account_id));
+    }
 }
 
 #[tauri::command]
@@ -213,8 +247,9 @@ pub async fn get_provider_health(
 pub async fn get_history(
     state: State<'_, AppState>,
     days: i64,
+    account_id: Option<String>,
 ) -> Result<Vec<HistoryPointView>, CommandError> {
-    storage::history(&state.db, days).await
+    storage::history(&state.db, days, account_id.as_deref()).await
 }
 
 #[tauri::command]
@@ -228,14 +263,17 @@ pub async fn export_latest_snapshot(
         .path()
         .download_dir()
         .map_err(|_| CommandError::storage("无法定位下载目录"))?;
+    // 文件名带毫秒：同秒内连续导出不再互相覆盖。
     let filename = format!(
         "ai-quota-snapshot-{}.json",
-        Utc::now().format("%Y%m%d-%H%M%S")
+        Utc::now().format("%Y%m%d-%H%M%S%3f")
     );
     let path = directory.join(filename);
     let contents = serde_json::to_vec_pretty(&document)
         .map_err(|_| CommandError::storage("无法生成脱敏快照"))?;
-    std::fs::write(&path, contents).map_err(|_| CommandError::storage("无法写入脱敏快照"))?;
+    tokio::fs::write(&path, contents)
+        .await
+        .map_err(|_| CommandError::storage("无法写入脱敏快照"))?;
     Ok(path.to_string_lossy().into_owned())
 }
 
@@ -277,11 +315,15 @@ pub async fn export_diagnostics(
         .map_err(|_| CommandError::storage("无法定位下载目录"))?;
     let path = directory.join(format!(
         "ai-quota-diagnostics-{}.zip",
-        generated_at.format("%Y%m%d-%H%M%S")
+        generated_at.format("%Y%m%d-%H%M%S%3f")
     ));
     let entries = diagnostic_entries(manifest, health, settings, sanitized_snapshot(&overview))?;
-    write_diagnostic_archive(&path, &entries)?;
-    Ok(path.to_string_lossy().into_owned())
+    // ZIP 打包是同步压缩 IO，放 blocking 线程池，避免阻塞 async 运行时。
+    let path_text = path.to_string_lossy().into_owned();
+    tauri::async_runtime::spawn_blocking(move || write_diagnostic_archive(&path, &entries))
+        .await
+        .map_err(|_| CommandError::storage("诊断打包任务失败"))??;
+    Ok(path_text)
 }
 
 fn diagnostic_entries(
@@ -581,24 +623,25 @@ async fn refresh(
     }
     let count = targets.len();
     let pool = pool.clone();
-    let provider_limits = Arc::new(HashMap::from([
-        ("clinepass".to_string(), Arc::new(Semaphore::new(2))),
-        ("opencode-go".to_string(), Arc::new(Semaphore::new(2))),
-        ("ollama-cloud".to_string(), Arc::new(Semaphore::new(2))),
-    ]));
     let results = stream::iter(targets.into_iter().map(|target| {
         let app = app.clone();
         let pool = pool.clone();
-        let semaphore = provider_limits
-            .get(&target.provider)
-            .cloned()
-            .unwrap_or_else(|| Arc::new(Semaphore::new(1)));
+        let semaphore = provider_semaphore(&target.provider);
+        let in_flight_key = target.id.clone();
         async move {
-            let _permit = semaphore
-                .acquire_owned()
-                .await
-                .map_err(|_| CommandError::network("刷新并发控制器已关闭"))?;
-            refresh_target(&app, &pool, target).await
+            if !try_mark_in_flight(&in_flight_key) {
+                return Ok(()); // 已有相同账号的刷新在途，跳过重复抓取
+            }
+            let result = async {
+                let _permit = semaphore
+                    .acquire_owned()
+                    .await
+                    .map_err(|_| CommandError::network("刷新并发控制器已关闭"))?;
+                refresh_target(&app, &pool, target).await
+            }
+            .await;
+            clear_in_flight(&in_flight_key);
+            result
         }
     }))
     .buffer_unordered(4)
@@ -925,7 +968,9 @@ fn normalize_credential(provider: &str, input: &str) -> String {
     let normalized = from_json
         .or(from_header_lines)
         .unwrap_or_else(|| input.trim().to_string());
-    if provider == "clinepass" || (provider == "ollama-cloud" && !normalized.contains('=')) {
+    // API Key 与 Cookie 都不会以 "Bearer " 开头，因此无需启发式判断：
+    // 无条件剥离前缀即可，含 "=" 的 base64 API Key（曾被误判为 Cookie 而跳过）也能归一。
+    if provider == "clinepass" || provider == "ollama-cloud" {
         normalized
             .strip_prefix("Bearer ")
             .or_else(|| normalized.strip_prefix("bearer "))
@@ -1019,6 +1064,11 @@ mod tests {
         assert_eq!(
             normalize_credential("ollama-cloud", "ollama.key"),
             "ollama.key"
+        );
+        // 含 "=" 的 base64 形态 API Key 不再被误判为 Cookie 而跳过 Bearer 剥离
+        assert_eq!(
+            normalize_credential("ollama-cloud", "Bearer dXNlcjpwYXNzPQ=="),
+            "dXNlcjpwYXNzPQ=="
         );
     }
 
